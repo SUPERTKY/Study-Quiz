@@ -50,14 +50,7 @@ body {
 }
 
 .next-screen {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 1rem;
-  padding: 2rem;
-  text-align: center;
-  background: #fff;
-  color: #111;
+  background: #000 url("assets/images/ui/battle_bg.png") center / cover no-repeat;
   opacity: 0;
   z-index: 0;
 }
@@ -66,16 +59,6 @@ body {
   opacity: 1;
 }
 
-.next-screen h1 {
-  margin: 0;
-  font-size: clamp(2.5rem, 8vw, 6rem);
-  letter-spacing: 0.06em;
-}
-
-.next-screen p {
-  margin: 0;
-  font-size: clamp(1rem, 2.5vw, 1.5rem);
-}
 
 .fade-overlay {
   pointer-events: none;
