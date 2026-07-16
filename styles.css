@@ -54,6 +54,8 @@ body {
 }
 
 .next-screen {
+  display: grid;
+  place-items: center;
   background: #000 url("assets/images/ui/battle_bg.png") center / cover no-repeat;
   opacity: 0;
   z-index: 1;
@@ -61,6 +63,25 @@ body {
 
 .next-screen.is-visible {
   opacity: 1;
+}
+
+.title-image {
+  width: min(72vw, 760px);
+  max-height: 42vh;
+  object-fit: contain;
+  opacity: 0;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 1s ease,
+    transform 800ms ease-in-out;
+}
+
+.title-image.is-visible {
+  opacity: 1;
+}
+
+.title-image.is-settled {
+  transform: translateY(-8vh) scale(0.86);
 }
 
 .fade-overlay {
