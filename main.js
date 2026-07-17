@@ -25,6 +25,8 @@ const playerHpText = document.querySelector("#playerHpText");
 const opponentHpText = document.querySelector("#opponentHpText");
 const playerHpGauge = document.querySelector("#playerHpGauge");
 const opponentHpGauge = document.querySelector("#opponentHpGauge");
+const playerCharacter = document.querySelector(".battle-character--player");
+const opponentCharacter = document.querySelector(".battle-character--opponent");
 const skillButtons = Array.from(document.querySelectorAll(".battle-action"));
 
 const skills = {
@@ -125,6 +127,33 @@ const updateSkillButtons = () => {
   });
 };
 
+const getDamageStage = (damage) => {
+  if (damage >= 42) {
+    return "huge";
+  }
+
+  if (damage >= 24) {
+    return "large";
+  }
+
+  if (damage >= 12) {
+    return "medium";
+  }
+
+  return "small";
+};
+
+const playDamageEffect = (characterElement, damage) => {
+  if (!characterElement || damage <= 0) {
+    return;
+  }
+
+  characterElement.dataset.damageStage = getDamageStage(damage);
+  characterElement.classList.remove("is-taking-damage");
+  void characterElement.offsetWidth;
+  characterElement.classList.add("is-taking-damage");
+};
+
 const tickCooldownsAtPlayerTurnStart = () => {
   Object.keys(battleState.cooldowns).forEach((skillKey) => {
     battleState.cooldowns[skillKey] = Math.max(0, battleState.cooldowns[skillKey] - 1);
@@ -187,10 +216,12 @@ const useSkill = (skillKey) => {
 
   const effectValue = Math.round(skill.base + fallbackPoint * skill.perPoint);
   let message = "";
+  let damageTarget = null;
 
   if (skill.type === "damage") {
     battleState.opponentHp = Math.max(0, battleState.opponentHp - effectValue);
     message = `${skill.name}！ 問題ファイル未使用のためポイント${fallbackPoint}で、相手に${effectValue}ダメージ。`;
+    damageTarget = opponentCharacter;
   }
 
   if (skill.type === "recover") {
@@ -210,6 +241,7 @@ const useSkill = (skillKey) => {
   }
 
   updateHpDisplay();
+  playDamageEffect(damageTarget, skill.type === "damage" ? effectValue : 0);
   setBattleMessage(message);
 
   if (!finishBattleIfNeeded()) {

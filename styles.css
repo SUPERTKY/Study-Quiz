@@ -179,10 +179,6 @@ body {
   margin-right: 12px;
 }
 
-.hp-display--opponent .hp-display__art {
-  transform: scaleX(-1);
-}
-
 .hp-display__art,
 .hp-display__bar {
   position: absolute;
@@ -307,10 +303,71 @@ body {
 .battle-character {
   position: absolute;
   top: 52%;
+  --damage-brightness: 1.15;
+  --damage-shake: 4px;
+  --damage-duration: 260ms;
   width: min(30vw, 320px);
   max-height: 44vh;
   object-fit: contain;
   transform: translateY(-50%);
+}
+
+.battle-character.is-taking-damage {
+  animation: character-damage-shake var(--damage-duration) ease-in-out;
+}
+
+.battle-character[data-damage-stage="small"] {
+  --damage-brightness: 1.12;
+  --damage-shake: 4px;
+  --damage-duration: 250ms;
+}
+
+.battle-character[data-damage-stage="medium"] {
+  --damage-brightness: 1.2;
+  --damage-shake: 7px;
+  --damage-duration: 320ms;
+}
+
+.battle-character[data-damage-stage="large"] {
+  --damage-brightness: 1.28;
+  --damage-shake: 11px;
+  --damage-duration: 400ms;
+}
+
+.battle-character[data-damage-stage="huge"] {
+  --damage-brightness: 1.35;
+  --damage-shake: 15px;
+  --damage-duration: 400ms;
+}
+
+@keyframes character-damage-shake {
+  0%,
+  100% {
+    filter: none;
+    transform: translate(0, -50%);
+  }
+
+  12%,
+  36%,
+  60% {
+    filter:
+      sepia(1)
+      saturate(6)
+      hue-rotate(315deg)
+      brightness(var(--damage-brightness));
+    transform: translate(calc(var(--damage-shake) * -1), -50%);
+  }
+
+  24%,
+  48%,
+  72% {
+    filter:
+      sepia(1)
+      saturate(6)
+      hue-rotate(315deg)
+      brightness(var(--damage-brightness));
+    transform: translate(var(--damage-shake), -50%);
+  }
 }
 
 .battle-character--player {
