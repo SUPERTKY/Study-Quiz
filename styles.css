@@ -84,6 +84,100 @@ body {
   transform: translateY(-22vh) scale(0.82);
 }
 
+.matching-button {
+  position: absolute;
+  top: 54%;
+  left: 50%;
+  width: min(48vw, 440px);
+  max-height: 22vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+.matching-button img {
+  display: block;
+  width: 100%;
+  max-height: 22vh;
+  object-fit: contain;
+}
+
+.matching-button.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+.matching-button:disabled {
+  cursor: default;
+}
+
+.next-screen.is-battle-starting .title-image {
+  opacity: 0;
+  transform: translateY(-72vh) scale(0.82);
+  transition:
+    opacity 900ms ease,
+    transform 900ms ease-in;
+}
+
+.next-screen.is-battle-starting .matching-button {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.94);
+  pointer-events: none;
+}
+
+.battle-scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 700ms ease;
+}
+
+.battle-scene.is-visible {
+  opacity: 1;
+}
+
+.battle-character {
+  position: absolute;
+  top: 58%;
+  width: min(30vw, 320px);
+  max-height: 44vh;
+  object-fit: contain;
+  transform: translateY(-50%);
+}
+
+.battle-character--player {
+  left: 10%;
+}
+
+.battle-character--opponent {
+  right: 10%;
+}
+
+.battle-actions {
+  position: absolute;
+  right: 7%;
+  bottom: 6%;
+  display: flex;
+  flex-direction: row-reverse;
+  gap: clamp(16px, 3vw, 36px);
+  align-items: center;
+}
+
+.battle-actions img {
+  width: clamp(64px, 9vw, 118px);
+  height: clamp(64px, 9vw, 118px);
+  object-fit: contain;
+}
+
 .fade-overlay {
   pointer-events: none;
   background: #000;
