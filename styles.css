@@ -143,6 +143,7 @@ body {
 
 .battle-scene.is-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 
@@ -205,12 +206,17 @@ body {
   padding: 10.8% 8.2% 31.9% 24.2%;
   clip-path: inset(0 var(--hp-cut) 0 0);
   transition: clip-path 320ms ease;
+  z-index: 1;
+}
+
+.hp-display__bar {
+  z-index: 0;
 }
 
 .hp-display__name,
 .hp-display__value {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   text-shadow:
     0 2px 4px rgba(0, 0, 0, 0.9),
     0 0 8px rgba(0, 0, 0, 0.9);
