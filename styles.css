@@ -152,7 +152,7 @@ body {
   --player-hp-bar-width: min(72vw, 620px);
   --player-hp-gauge-left: 50px;
   --player-hp-gauge-top: 28px;
-  --player-hp-gauge-scale: 0.1;
+  --player-hp-gauge-scale: 0.3;
 
   position: absolute;
   top: var(--player-hp-top);
