@@ -147,7 +147,7 @@ body {
 
 .battle-character {
   position: absolute;
-  top: 58%;
+  top: 52%;
   width: min(30vw, 320px);
   max-height: 44vh;
   object-fit: contain;
@@ -164,17 +164,20 @@ body {
 
 .battle-actions {
   position: absolute;
-  right: 7%;
-  bottom: 6%;
+  left: 50%;
+  bottom: clamp(18px, 4vh, 44px);
+  width: min(92vw, 980px);
   display: flex;
   flex-direction: row-reverse;
-  gap: clamp(16px, 3vw, 36px);
+  gap: clamp(20px, 4vw, 56px);
   align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
 }
 
 .battle-actions img {
-  width: clamp(64px, 9vw, 118px);
-  height: clamp(64px, 9vw, 118px);
+  width: clamp(104px, 14vw, 176px);
+  height: clamp(104px, 14vw, 176px);
   object-fit: contain;
 }
 
