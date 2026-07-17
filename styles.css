@@ -324,7 +324,7 @@ body {
 }
 
 .battle-character.is-recovering {
-  animation: character-recover-flash 250ms ease-out;
+  animation: character-recover-flash 300ms ease-out;
 }
 
 .battle-character[data-damage-stage="small"] {
@@ -389,10 +389,11 @@ body {
 
   45% {
     filter:
+      drop-shadow(0 0 18px rgba(84, 255, 118, 0.95))
       sepia(1)
-      saturate(5)
-      hue-rotate(65deg)
-      brightness(1.25);
+      saturate(8)
+      hue-rotate(55deg)
+      brightness(1.35);
   }
 }
 

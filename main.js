@@ -156,8 +156,8 @@ const playDamageEffect = (characterElement, damage) => {
   characterElement.classList.add("is-taking-damage");
 };
 
-const playRecoverEffect = (characterElement, amount) => {
-  if (!characterElement || amount <= 0) {
+const playRecoverEffect = (characterElement) => {
+  if (!characterElement) {
     return;
   }
 
@@ -184,9 +184,11 @@ const tickCooldownsAtPlayerTurnStart = () => {
 
 const startPlayerTurn = () => {
   battleState.phase = "player";
+  battleState.playerGuardReduction = 0;
   tickCooldownsAtPlayerTurnStart();
   turnLabel.textContent = "自分のターン";
   setBattleMessage("自分のターンです。バトルアイコンから技を選んでください。");
+  updateGuardOverlay();
   updateSkillButtons();
   playAudioFromStart(turnStartAudio);
 };
@@ -267,7 +269,9 @@ const useSkill = (skillKey) => {
   updateHpDisplay();
   updateGuardOverlay();
   playDamageEffect(damageTarget, skill.type === "damage" ? effectValue : 0);
-  playRecoverEffect(playerCharacter, recoverAmount);
+  if (skill.type === "recover") {
+    playRecoverEffect(playerCharacter);
+  }
   setBattleMessage(message);
 
   if (!finishBattleIfNeeded()) {
