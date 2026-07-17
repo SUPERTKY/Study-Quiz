@@ -186,6 +186,10 @@ body {
   margin-right: 12px;
 }
 
+.hp-display--opponent .hp-display__art {
+  transform: scaleX(-1);
+}
+
 .hp-display__art,
 .hp-display__bar {
   position: absolute;

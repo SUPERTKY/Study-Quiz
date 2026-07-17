@@ -25,10 +25,6 @@ const playerHpText = document.querySelector("#playerHpText");
 const opponentHpText = document.querySelector("#opponentHpText");
 const playerHpGauge = document.querySelector("#playerHpGauge");
 const opponentHpGauge = document.querySelector("#opponentHpGauge");
-const playerCharacter = document.querySelector(".battle-character--player");
-const opponentCharacter = document.querySelector(".battle-character--opponent");
-const playerGuardOverlay = document.querySelector("#playerGuardOverlay");
-const playerGuardValue = document.querySelector("#playerGuardValue");
 const skillButtons = Array.from(document.querySelectorAll(".battle-action"));
 
 const skills = {
@@ -129,53 +125,6 @@ const updateSkillButtons = () => {
   });
 };
 
-const getDamageStage = (damage) => {
-  if (damage >= 42) {
-    return "huge";
-  }
-
-  if (damage >= 24) {
-    return "large";
-  }
-
-  if (damage >= 12) {
-    return "medium";
-  }
-
-  return "small";
-};
-
-const playDamageEffect = (characterElement, damage) => {
-  if (!characterElement || damage <= 0) {
-    return;
-  }
-
-  characterElement.dataset.damageStage = getDamageStage(damage);
-  characterElement.classList.remove("is-taking-damage");
-  void characterElement.offsetWidth;
-  characterElement.classList.add("is-taking-damage");
-};
-
-const playRecoverEffect = (characterElement) => {
-  if (!characterElement) {
-    return;
-  }
-
-  characterElement.classList.remove("is-recovering");
-  void characterElement.offsetWidth;
-  characterElement.classList.add("is-recovering");
-};
-
-const updateGuardOverlay = () => {
-  if (!playerGuardOverlay || !playerGuardValue) {
-    return;
-  }
-
-  const reduction = battleState.playerGuardReduction;
-  playerGuardOverlay.classList.toggle("is-active", reduction > 0);
-  playerGuardValue.textContent = `${reduction}%`;
-};
-
 const tickCooldownsAtPlayerTurnStart = () => {
   Object.keys(battleState.cooldowns).forEach((skillKey) => {
     battleState.cooldowns[skillKey] = Math.max(0, battleState.cooldowns[skillKey] - 1);
@@ -184,11 +133,9 @@ const tickCooldownsAtPlayerTurnStart = () => {
 
 const startPlayerTurn = () => {
   battleState.phase = "player";
-  battleState.playerGuardReduction = 0;
   tickCooldownsAtPlayerTurnStart();
   turnLabel.textContent = "自分のターン";
   setBattleMessage("自分のターンです。バトルアイコンから技を選んでください。");
-  updateGuardOverlay();
   updateSkillButtons();
   playAudioFromStart(turnStartAudio);
 };
@@ -240,20 +187,16 @@ const useSkill = (skillKey) => {
 
   const effectValue = Math.round(skill.base + fallbackPoint * skill.perPoint);
   let message = "";
-  let damageTarget = null;
-  let recoverAmount = 0;
 
   if (skill.type === "damage") {
     battleState.opponentHp = Math.max(0, battleState.opponentHp - effectValue);
     message = `${skill.name}！ 問題ファイル未使用のためポイント${fallbackPoint}で、相手に${effectValue}ダメージ。`;
-    damageTarget = opponentCharacter;
   }
 
   if (skill.type === "recover") {
     const beforeHp = battleState.playerHp;
     battleState.playerHp = Math.min(maxHp, battleState.playerHp + effectValue);
-    recoverAmount = battleState.playerHp - beforeHp;
-    message = `${skill.name}！ 問題ファイル未使用のためポイント${fallbackPoint}で、自分のHPを${recoverAmount}回復。`;
+    message = `${skill.name}！ 問題ファイル未使用のためポイント${fallbackPoint}で、自分のHPを${battleState.playerHp - beforeHp}回復。`;
   }
 
   if (skill.type === "guard") {
@@ -267,11 +210,6 @@ const useSkill = (skillKey) => {
   }
 
   updateHpDisplay();
-  updateGuardOverlay();
-  playDamageEffect(damageTarget, skill.type === "damage" ? effectValue : 0);
-  if (skill.type === "recover") {
-    playRecoverEffect(playerCharacter);
-  }
   setBattleMessage(message);
 
   if (!finishBattleIfNeeded()) {
@@ -288,7 +226,6 @@ const resetBattle = () => {
   battleState.cooldowns.guard = 0;
   battleState.cooldowns.burst = 0;
   updateHpDisplay();
-  updateGuardOverlay();
   updateSkillButtons();
 };
 
