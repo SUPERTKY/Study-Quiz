@@ -29,19 +29,29 @@
           <img src="assets/images/ui/Matching_Button.png" alt="マッチング" />
         </button>
         <div id="battleScene" class="battle-scene" aria-label="バトルシーン">
-          <div class="player-hp" aria-label="プレイヤーの体力">
-            <img
-              class="player-hp__bar"
-              src="assets/images/ui/HP_bar.png"
-              alt="プレイヤーHPバー"
-            />
-            <img
-              class="player-hp__gauge"
-              src="assets/images/ui/HP_gauge.png"
-              alt=""
-              aria-hidden="true"
-            />
+          <div class="battle-hud" aria-label="HPとターン情報">
+            <div class="hp-display hp-display--player" aria-label="プレイヤーの体力">
+              <div class="hp-display__art" aria-hidden="true">
+                <span class="hp-display__gauge" id="playerHpGauge"></span>
+                <img class="hp-display__bar" src="assets/images/ui/HP_bar.png" alt="" />
+              </div>
+              <span class="hp-display__name">自分</span>
+              <span id="playerHpText" class="hp-display__value">120 / 120</span>
+            </div>
+            <div class="turn-panel">
+              <span id="turnLabel" class="turn-panel__label">準備中</span>
+              <span class="turn-panel__subject">教科: 未選択</span>
+            </div>
+            <div class="hp-display hp-display--opponent" aria-label="相手の体力">
+              <div class="hp-display__art" aria-hidden="true">
+                <span class="hp-display__gauge" id="opponentHpGauge"></span>
+                <img class="hp-display__bar" src="assets/images/ui/HP_bar.png" alt="" />
+              </div>
+              <span class="hp-display__name">相手</span>
+              <span id="opponentHpText" class="hp-display__value">120 / 120</span>
+            </div>
           </div>
+          <p id="battleMessage" class="battle-message">バトル開始を待っています。</p>
           <img
             class="battle-character battle-character--player"
             src="assets/images/characters/player_default.png"
@@ -52,11 +62,19 @@
             src="assets/images/characters/opponent_default.png"
             alt="相手"
           />
-          <div class="battle-actions" aria-label="技アイコン">
-            <img src="assets/images/ui/Icon/Battle_Icon/recover_icon.png" alt="リカバー" />
-            <img src="assets/images/ui/Icon/Battle_Icon/guard_icon.png" alt="ガード" />
-            <img src="assets/images/ui/Icon/Battle_Icon/burst_icon.png" alt="バースト" />
-            <img src="assets/images/ui/Icon/Battle_Icon/attack_icon.png" alt="アタック" />
+          <div id="battleActions" class="battle-actions" aria-label="技アイコン">
+            <button class="battle-action" type="button" data-skill="recover" aria-label="リカバーを使う">
+              <img src="assets/images/ui/Icon/Battle_Icon/recover_icon.png" alt="リカバー" />
+            </button>
+            <button class="battle-action" type="button" data-skill="guard" aria-label="ガードを使う">
+              <img src="assets/images/ui/Icon/Battle_Icon/guard_icon.png" alt="ガード" />
+            </button>
+            <button class="battle-action" type="button" data-skill="burst" aria-label="バーストを使う">
+              <img src="assets/images/ui/Icon/Battle_Icon/burst_icon.png" alt="バースト" />
+            </button>
+            <button class="battle-action" type="button" data-skill="attack" aria-label="アタックを使う">
+              <img src="assets/images/ui/Icon/Battle_Icon/attack_icon.png" alt="アタック" />
+            </button>
           </div>
         </div>
       </section>
@@ -65,5 +83,6 @@
     </main>
 
     <audio id="openingAudio" src="assets/audio/Opening.mp3" preload="auto"></audio>
+    <audio id="turnStartAudio" src="assets/audio/turn_start.mp3" preload="auto"></audio>
   </body>
 </html>
