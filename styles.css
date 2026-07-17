@@ -145,6 +145,39 @@ body {
   opacity: 1;
 }
 
+
+.player-hp {
+  /* HP表示の調整値: 位置やサイズを変えたい場合はここだけ編集してください。 */
+  --player-hp-top: clamp(14px, 3vh, 32px);
+  --player-hp-bar-width: min(72vw, 620px);
+  --player-hp-gauge-left: 50px;
+  --player-hp-gauge-top: 28px;
+  --player-hp-gauge-scale: 0.5;
+
+  position: absolute;
+  top: var(--player-hp-top);
+  left: 50%;
+  width: var(--player-hp-bar-width);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.player-hp__bar {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.player-hp__gauge {
+  position: absolute;
+  top: var(--player-hp-gauge-top);
+  left: var(--player-hp-gauge-left);
+  width: auto;
+  height: auto;
+  transform: scale(var(--player-hp-gauge-scale));
+  transform-origin: top left;
+}
+
 .battle-character {
   position: absolute;
   top: 52%;
