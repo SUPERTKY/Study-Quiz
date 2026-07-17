@@ -84,6 +84,26 @@ body {
   transform: translateY(-22vh) scale(0.82);
 }
 
+.matching-button {
+  position: absolute;
+  top: 54%;
+  left: 50%;
+  width: min(48vw, 440px);
+  max-height: 22vh;
+  object-fit: contain;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+  pointer-events: none;
+}
+
+.matching-button.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 .fade-overlay {
   pointer-events: none;
   background: #000;

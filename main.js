@@ -4,6 +4,7 @@ const fadeDurationMs = 1000;
 const titleAppearDelayMs = 1500;
 const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
+const titleMoveDurationMs = 800;
 
 const opening = document.querySelector("#opening");
 const openingImage = document.querySelector("#openingImage");
@@ -11,6 +12,7 @@ const openingAudio = document.querySelector("#openingAudio");
 const fadeOverlay = document.querySelector("#fadeOverlay");
 const nextScreen = document.querySelector("#nextScreen");
 const titleImage = document.querySelector("#titleImage");
+const matchingButton = document.querySelector("#matchingButton");
 
 const playOpeningAudio = () => {
   openingAudio.currentTime = 0;
@@ -40,6 +42,10 @@ const showNextScreen = () => {
 
     window.setTimeout(() => {
       titleImage.classList.add("is-settled");
+
+      window.setTimeout(() => {
+        matchingButton.classList.add("is-visible");
+      }, titleMoveDurationMs);
     }, titleFadeDurationMs + titleMoveDelayMs);
   }, titleAppearDelayMs);
 };
