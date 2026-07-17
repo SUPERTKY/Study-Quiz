@@ -203,7 +203,7 @@ body {
 
 .hp-display__gauge {
   padding: 10.8% 8.2% 31.9% 24.2%;
-  clip-path: inset(0 0 0 var(--hp-cut));
+  clip-path: inset(0 var(--hp-cut) 0 0);
   transition: clip-path 320ms ease;
 }
 
