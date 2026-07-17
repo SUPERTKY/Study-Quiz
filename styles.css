@@ -150,8 +150,8 @@ body {
   /* HP表示の調整値: 位置やサイズを変えたい場合はここだけ編集してください。 */
   --player-hp-top: clamp(14px, 3vh, 32px);
   --player-hp-bar-width: min(72vw, 620px);
-  --player-hp-gauge-left: 35px;
-  --player-hp-gauge-top: 10px;
+  --player-hp-gauge-left: 85px;
+  --player-hp-gauge-top: -20px;
   --player-hp-gauge-scale: 0.25;
 
   position: absolute;
