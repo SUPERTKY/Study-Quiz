@@ -49,6 +49,7 @@
               <div class="admin-screen__actions">
                 <button id="adminHostButton" class="admin-screen__host" type="submit">この教科で開催する</button>
                 <button id="adminStopButton" class="admin-screen__stop" type="button">開催を終了する</button>
+                <button id="adminRoundButton" class="admin-screen__round" type="button">大会最初のマッチング締め切り</button>
                 <button id="adminBackButton" class="admin-screen__back" type="button">タイトルへ戻る</button>
               </div>
             </form>
@@ -95,6 +96,7 @@
             <p id="questionText" class="question-panel__text"></p>
             <div id="questionChoices" class="question-panel__choices" aria-label="選択肢"></div>
             <p id="answerFeedback" class="question-panel__feedback" aria-live="assertive"></p>
+            <img id="answerFeedbackIcon" class="answer-feedback-icon" src="assets/images/ui/Icon/correct.png" alt="" aria-hidden="true" />
           </section>
           <img
             class="battle-character battle-character--player"
@@ -124,6 +126,12 @@
               <img src="assets/images/ui/Icon/Battle_Icon/attack_icon.png" alt="アタック" />
             </button>
           </div>
+        <div id="turnRoulette" class="turn-roulette" aria-hidden="true">
+            <img id="turnRouletteImage" src="assets/images/ui/Icon/your_turn.png" alt="" />
+          </div>
+          <div id="resultOverlay" class="result-overlay" aria-live="assertive" hidden>
+            <img id="resultImage" src="assets/images/ui/Victory.png" alt="" />
+          </div>
         </div>
       </section>
 
@@ -152,5 +160,9 @@
     <audio id="damageHugeAudio" src="assets/audio/damage_huge.mp3" preload="auto"></audio>
     <audio id="recoverAudio" src="assets/audio/recover.mp3" preload="auto"></audio>
     <audio id="guardAudio" src="assets/audio/guard.mp3" preload="auto"></audio>
+    <audio id="correctAudio" src="assets/audio/correct.mp3" preload="auto"></audio>
+    <audio id="fallOverAudio" src="assets/audio/fall_over.mp3" preload="auto"></audio>
+    <audio id="victoryAudio" src="assets/audio/victory.mp3" preload="auto"></audio>
+    <audio id="defeatAudio" src="assets/audio/defeat.mp3" preload="auto"></audio>
   </body>
 </html>

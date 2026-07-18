@@ -6,7 +6,8 @@ const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
-const opponentWaitMs = 5000;
+const matchingPollMs = 1500;
+const resultReturnMs = 10000;
 const questionDurationSeconds = 20;
 const feedbackDurationMs = 260;
 const authEndpoint = "/api/auth";
@@ -41,6 +42,10 @@ const damageLargeAudio = document.querySelector("#damageLargeAudio");
 const damageHugeAudio = document.querySelector("#damageHugeAudio");
 const recoverAudio = document.querySelector("#recoverAudio");
 const guardAudio = document.querySelector("#guardAudio");
+const correctAudio = document.querySelector("#correctAudio");
+const fallOverAudio = document.querySelector("#fallOverAudio");
+const victoryAudio = document.querySelector("#victoryAudio");
+const defeatAudio = document.querySelector("#defeatAudio");
 const fadeOverlay = document.querySelector("#fadeOverlay");
 const nextScreen = document.querySelector("#nextScreen");
 const titleImage = document.querySelector("#titleImage");
@@ -53,6 +58,7 @@ const adminGameForm = document.querySelector("#adminGameForm");
 const adminStatus = document.querySelector("#adminStatus");
 const adminHostButton = document.querySelector("#adminHostButton");
 const adminStopButton = document.querySelector("#adminStopButton");
+const adminRoundButton = document.querySelector("#adminRoundButton");
 const passwordGate = document.querySelector("#passwordGate");
 const passwordForm = document.querySelector("#passwordForm");
 const passwordTitle = document.querySelector("#passwordTitle");
@@ -71,6 +77,11 @@ const questionScore = document.querySelector("#questionScore");
 const questionText = document.querySelector("#questionText");
 const questionChoices = document.querySelector("#questionChoices");
 const answerFeedback = document.querySelector("#answerFeedback");
+const answerFeedbackIcon = document.querySelector("#answerFeedbackIcon");
+const turnRoulette = document.querySelector("#turnRoulette");
+const turnRouletteImage = document.querySelector("#turnRouletteImage");
+const resultOverlay = document.querySelector("#resultOverlay");
+const resultImage = document.querySelector("#resultImage");
 const playerHpText = document.querySelector("#playerHpText");
 const opponentHpText = document.querySelector("#opponentHpText");
 const playerHpGauge = document.querySelector("#playerHpGauge");
@@ -128,6 +139,13 @@ const battleState = {
   phase: "idle",
   selectedSubjectKey: "math",
   hosted: false,
+  tournamentId: 0,
+  round: 0,
+  closingRound: false,
+  playerId: localStorage.getItem("schoolRpgPlayerId") || crypto.randomUUID(),
+  match: null,
+  matchingTimerId: null,
+  eliminatedTournamentId: Number(localStorage.getItem("schoolRpgEliminatedTournamentId") || "-1"),
   questions: [],
   questionSession: null,
   playerHp: maxHp,
@@ -139,7 +157,7 @@ const battleState = {
     burst: 0,
   },
 };
-
+localStorage.setItem("schoolRpgPlayerId", battleState.playerId);
 
 const setPasswordMode = (mode) => {
   authState.mode = mode;
@@ -253,17 +271,18 @@ const getSelectedSubject = () => subjects[battleState.selectedSubjectKey] ?? sub
 const updateSessionUi = () => {
   const subject = getSelectedSubject();
   const statusText = battleState.hosted
-    ? `開催中: ${subject.label}`
+    ? `開催中: ${subject.label} / 大会${battleState.tournamentId} 第${battleState.round + 1}マッチング${battleState.closingRound ? "締め切り中" : ""}`
     : "現在は開催していません。管理者画面で教科を選んで開催してください。";
 
   subjectLabel.textContent = `教科: ${subject.label}`;
-  matchingButton.disabled = !battleState.hosted;
+  const isEliminated = battleState.eliminatedTournamentId === battleState.tournamentId;
+  matchingButton.disabled = !battleState.hosted || isEliminated || battleState.closingRound;
   matchingButton.title = battleState.hosted ? `${subject.label}でマッチング開始` : "";
   matchingButton.classList.toggle("is-visible", battleState.hosted && titleImage.classList.contains("is-settled"));
   if (sessionNotice) {
-    sessionNotice.hidden = battleState.hosted;
-    sessionNotice.textContent = "現在開催していません。管理者が開催するまで遊べません。";
-    sessionNotice.classList.toggle("is-visible", !battleState.hosted && titleImage.classList.contains("is-settled"));
+    sessionNotice.hidden = battleState.hosted && !isEliminated && !battleState.closingRound;
+    sessionNotice.textContent = !battleState.hosted ? "現在開催していません。管理者が開催するまで遊べません。" : isEliminated ? "一回負けたため、次の大会までマッチングできません。" : "マッチング締め切り中です。次のトーナメント開始を待ってください。";
+    sessionNotice.classList.toggle("is-visible", !sessionNotice.hidden && titleImage.classList.contains("is-settled"));
   }
   if (adminStatus) {
     adminStatus.textContent = statusText;
@@ -275,8 +294,15 @@ const updateSessionUi = () => {
 };
 
 const applyRemoteSession = (session) => {
+  const wasHosted = battleState.hosted;
   battleState.hosted = session?.hosted === true;
   battleState.selectedSubjectKey = subjects[session?.selectedSubjectKey] ? session.selectedSubjectKey : "math";
+  battleState.tournamentId = Number.isInteger(session?.tournamentId) ? session.tournamentId : battleState.tournamentId;
+  battleState.round = Number.isInteger(session?.round) ? session.round : battleState.round;
+  battleState.closingRound = session?.closingRound === true;
+  if (wasHosted && !battleState.hosted && battleState.phase !== "idle") {
+    forceReturnToTitle("開催が終了したため、バトルを強制終了しました。");
+  }
   updateSessionUi();
 };
 
@@ -310,6 +336,86 @@ const saveRemoteSession = async (session) => {
   }
 
   applyRemoteSession(await response.json());
+};
+
+
+
+const postSessionAction = async (payload) => {
+  const response = await fetch(sessionEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`セッション操作に失敗しました: ${response.status}`);
+  }
+  return response.json();
+};
+
+const playAnswerIcon = (isCorrect) => {
+  if (!answerFeedbackIcon) return;
+  answerFeedbackIcon.src = isCorrect ? "assets/images/ui/Icon/correct.png" : "assets/images/ui/Icon/wrong.png";
+  answerFeedbackIcon.classList.remove("is-playing");
+  void answerFeedbackIcon.offsetWidth;
+  answerFeedbackIcon.classList.add("is-playing");
+  if (isCorrect) {
+    playAudioFromStart(correctAudio);
+  }
+};
+
+const forceReturnToTitle = (message = "タイトルに戻りました。") => {
+  if (battleState.questionSession?.timerId) {
+    window.clearInterval(battleState.questionSession.timerId);
+  }
+  if (battleState.matchingTimerId) {
+    window.clearInterval(battleState.matchingTimerId);
+    battleState.matchingTimerId = null;
+  }
+  resetBattle();
+  nextScreen.classList.remove("is-battle-starting");
+  battleScene.classList.remove("is-visible");
+  resultOverlay.hidden = true;
+  playerCharacter.classList.remove("is-falling");
+  opponentCharacter.classList.remove("is-falling");
+  setBattleMessage(message);
+  updateSessionUi();
+};
+
+const showResult = async (result) => {
+  battleState.phase = "finished";
+  updateSkillButtons();
+  const won = result === "win";
+  const defeatedCharacter = won ? opponentCharacter : playerCharacter;
+  playAudioFromStart(fallOverAudio);
+  defeatedCharacter.classList.add("is-falling");
+  await new Promise((resolve) => window.setTimeout(resolve, 1300));
+  resultImage.src = won ? "assets/images/ui/Victory.png" : "assets/images/ui/defeat.png";
+  resultImage.alt = won ? "勝利" : "敗北";
+  resultOverlay.hidden = false;
+  playAudioFromStart(won ? victoryAudio : defeatAudio);
+  if (!won) {
+    battleState.eliminatedTournamentId = battleState.tournamentId;
+    localStorage.setItem("schoolRpgEliminatedTournamentId", String(battleState.tournamentId));
+  }
+  postSessionAction({ action: "finishMatch", playerId: battleState.playerId, matchId: battleState.match?.id, result }).catch(() => {});
+  window.setTimeout(() => forceReturnToTitle(won ? "勝利しました。" : "敗北しました。次の大会まで参加できません。"), resultReturnMs);
+};
+
+const playTurnRoulette = async (firstIsPlayer) => {
+  turnLabel.classList.add("is-hidden-before-start");
+  turnRoulette.classList.add("is-playing");
+  const images = ["assets/images/ui/Icon/your_turn.png", "assets/images/ui/Icon/enemy_turn.png"];
+  let index = 0;
+  const timerId = window.setInterval(() => {
+    turnRouletteImage.src = images[index % 2];
+    index += 1;
+  }, 130);
+  await new Promise((resolve) => window.setTimeout(resolve, 1800));
+  window.clearInterval(timerId);
+  turnRouletteImage.src = firstIsPlayer ? images[0] : images[1];
+  await new Promise((resolve) => window.setTimeout(resolve, 500));
+  turnRoulette.classList.remove("is-playing");
+  turnLabel.classList.remove("is-hidden-before-start");
 };
 
 const loadQuestions = async () => {
@@ -460,8 +566,9 @@ const handleChoiceClick = (event) => {
   const isCorrect = selectedIndex === question.answerIndex;
   session.correct += isCorrect ? 1 : 0;
   session.wrong += isCorrect ? 0 : 1;
-  answerFeedback.textContent = isCorrect ? "正解！" : "不正解";
+  answerFeedback.textContent = "";
   answerFeedback.dataset.result = isCorrect ? "correct" : "wrong";
+  playAnswerIcon(isCorrect);
   updateQuestionScore();
   session.index += 1;
   Array.from(questionChoices.children).forEach((choiceButton) => {
@@ -583,30 +690,33 @@ const startOpponentTurn = () => {
   turnLabel.classList.remove("is-entering");
   turnLabel.src = "assets/images/ui/Icon/enemy_turn.png";
   turnLabel.alt = "相手のターン";
-  setBattleMessage("");
+  setBattleMessage("相手のターンです。少し待ってください。");
   updateSkillButtons();
 
   window.setTimeout(() => {
-    if (battleState.phase === "opponent" && battleState.playerHp > 0 && battleState.opponentHp > 0) {
-      startPlayerTurn();
+    if (battleState.phase !== "opponent" || battleState.playerHp <= 0 || battleState.opponentHp <= 0) {
+      return;
     }
-  }, opponentWaitMs);
+    const baseDamage = Math.max(4, 14 - Math.round((14 * battleState.playerGuardReduction) / 100));
+    battleState.playerHp = Math.max(0, battleState.playerHp - baseDamage);
+    updateHpDisplay();
+    playDamageEffect(playerCharacter, baseDamage);
+    playDamageAudio(baseDamage);
+    setBattleMessage(`相手の攻撃！ 自分に${baseDamage}ダメージ。`);
+    if (!finishBattleIfNeeded()) {
+      window.setTimeout(startPlayerTurn, 900);
+    }
+  }, 1500);
 };
 
 const finishBattleIfNeeded = () => {
   if (battleState.opponentHp <= 0) {
-    battleState.phase = "finished";
-    turnLabel.alt = "勝利";
-    setBattleMessage("相手のHPが0になりました。勝利です！");
-    updateSkillButtons();
+    showResult("win");
     return true;
   }
 
   if (battleState.playerHp <= 0) {
-    battleState.phase = "finished";
-    turnLabel.alt = "敗北";
-    setBattleMessage("自分のHPが0になりました。敗北です。");
-    updateSkillButtons();
+    showResult("lose");
     return true;
   }
 
@@ -695,6 +805,46 @@ const resetBattle = () => {
   updateSkillButtons();
 };
 
+const beginMatchedBattle = async (match) => {
+  battleState.match = match;
+  if (battleState.matchingTimerId) {
+    window.clearInterval(battleState.matchingTimerId);
+    battleState.matchingTimerId = null;
+  }
+  setBattleMessage("マッチングしました！ 先攻・後攻を決めています。");
+  await loadQuestions();
+  battleScene.classList.add("is-visible");
+  const firstIsPlayer = match.firstPlayerId === battleState.playerId;
+  await playTurnRoulette(firstIsPlayer);
+  if (firstIsPlayer) {
+    startPlayerTurn();
+  } else {
+    startOpponentTurn();
+  }
+};
+
+const pollMatching = async () => {
+  try {
+    const session = await postSessionAction({ action: "joinMatch", playerId: battleState.playerId });
+    applyRemoteSession(session);
+    if (session.matchStatus === "eliminated") {
+      forceReturnToTitle("一回負けたため、次の大会までマッチングできません。");
+      return;
+    }
+    if (session.matchStatus === "closed") {
+      forceReturnToTitle("現在開催していません。");
+      return;
+    }
+    if (session.matchStatus === "matched" && session.match) {
+      await beginMatchedBattle(session.match);
+      return;
+    }
+    setBattleMessage("相手を探しています。同じタイミングで探している人とランダムにマッチングします。");
+  } catch (error) {
+    setBattleMessage("マッチング状態の確認に失敗しました。通信を確認してください。");
+  }
+};
+
 const startBattleScene = async () => {
   if (nextScreen.classList.contains("is-battle-starting")) {
     return;
@@ -704,16 +854,24 @@ const startBattleScene = async () => {
     setBattleMessage("管理者がゲームを開催するまで遊べません。");
     return;
   }
+  if (battleState.eliminatedTournamentId === battleState.tournamentId) {
+    setBattleMessage("一回負けたため、次の大会までマッチングできません。");
+    return;
+  }
+  if (battleState.closingRound) {
+    setBattleMessage("マッチング締め切り中です。次の開始を待ってください。");
+    return;
+  }
 
   matchingButton.disabled = true;
   nextScreen.classList.add("is-battle-starting");
+  battleScene.classList.add("is-visible");
   resetBattle();
-  await loadQuestions();
-
-  window.setTimeout(() => {
-    battleScene.classList.add("is-visible");
-    startPlayerTurn();
-  }, 600);
+  setBattleMessage("相手を探しています...");
+  await pollMatching();
+  if (!battleState.matchingTimerId && battleState.phase === "idle") {
+    battleState.matchingTimerId = window.setInterval(pollMatching, matchingPollMs);
+  }
 };
 
 const showNextScreen = () => {
@@ -776,64 +934,19 @@ adminStopButton.addEventListener("click", async () => {
   }
 });
 
-adminGameForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(adminGameForm);
-  const nextSubjectKey = String(formData.get("subject") ?? "math");
-  battleState.selectedSubjectKey = subjects[nextSubjectKey] ? nextSubjectKey : "math";
-  adminHostButton.disabled = true;
-  adminStatus.textContent = "オンラインに開催状態を保存しています...";
+adminRoundButton.addEventListener("click", async () => {
+  adminRoundButton.disabled = true;
+  const nextRoundLabel = battleState.round === 0 ? "トーナメント2次開始" : `トーナメント${battleState.round + 2}次開始`;
+  adminStatus.textContent = `5秒後に${nextRoundLabel}に進みます...`;
   try {
-    await saveRemoteSession({ hosted: true, selectedSubjectKey: battleState.selectedSubjectKey });
-    await loadQuestions();
+    await postSessionAction({ action: "advanceRound", adminPassword: authState.adminPassword });
+    adminRoundButton.textContent = nextRoundLabel;
+    await loadRemoteSession();
   } catch (error) {
-    adminStatus.textContent = "開催状態の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。";
+    adminStatus.textContent = "トーナメント進行に失敗しました。";
   } finally {
-    adminHostButton.disabled = false;
+    adminRoundButton.disabled = false;
   }
-});
-
-adminStopButton.addEventListener("click", async () => {
-  adminStopButton.disabled = true;
-  adminStatus.textContent = "オンラインに開催終了を保存しています...";
-  try {
-    await saveRemoteSession({ hosted: false, selectedSubjectKey: battleState.selectedSubjectKey });
-  } catch (error) {
-    adminStatus.textContent = "開催終了の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。";
-  } finally {
-    adminStopButton.disabled = false;
-  }
-});
-
-adminStopButton.addEventListener("click", async () => {
-  adminStopButton.disabled = true;
-  adminStatus.textContent = "オンラインに開催終了を保存しています...";
-  try {
-    await saveRemoteSession({ hosted: false, selectedSubjectKey: battleState.selectedSubjectKey });
-  } catch (error) {
-    adminStatus.textContent = "開催終了の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。";
-  } finally {
-    adminStopButton.disabled = false;
-  }
-});
-
-adminGameForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(adminGameForm);
-  const nextSubjectKey = String(formData.get("subject") ?? "math");
-  battleState.selectedSubjectKey = subjects[nextSubjectKey] ? nextSubjectKey : "math";
-  battleState.hosted = true;
-  adminHostButton.disabled = true;
-  await loadQuestions();
-  saveGameSession();
-  updateSessionUi();
-  adminHostButton.disabled = false;
-});
-
-adminStopButton.addEventListener("click", () => {
-  battleState.hosted = false;
-  saveGameSession();
-  updateSessionUi();
 });
 
 adminBackButton.addEventListener("click", () => {
