@@ -1,7 +1,8 @@
 const sessionKey = "current";
 const validSubjectKeys = new Set(["math", "japanese", "english", "science", "social"]);
 const waitingPlayerTimeoutMs = 30000;
-const matchPlayerTimeoutMs = 120000;
+// Polling two clients through KV can be delayed or reordered, so keep disconnect detection conservative.
+const matchPlayerTimeoutMs = 10 * 60 * 1000;
 
 const defaultSession = {
   hosted: false,
@@ -25,7 +26,7 @@ const json = (body, init = {}) =>
     },
   });
 
-const getSessionStore = (env) => env.GAME_SESSION_KV ?? env.GAME_SESSION;
+const getSessionStore = (env = {}) => env.GAME_SESSION_KV ?? env.GAME_SESSION;
 
 const normalizeSession = (session) => ({
   hosted: session?.hosted === true,
@@ -94,9 +95,37 @@ const pruneCurrentRoundWaitingPlayers = (session, playerIdToExclude = "", now = 
   session.waitingPlayers = Array.from(uniquePlayers.values());
 };
 
+const getMatchHeartbeatKey = (matchId, playerId) => `match:${matchId}:seen:${playerId}`;
+
 const touchMatchPlayer = (match, playerId, now = Date.now()) => {
   match.lastSeenByPlayerId ??= {};
   match.lastSeenByPlayerId[playerId] = now;
+};
+
+const writeMatchHeartbeat = async (env, match, playerId, now = Date.now()) => {
+  touchMatchPlayer(match, playerId, now);
+  const store = getSessionStore(env);
+  if (store && match?.id && playerId) {
+    try {
+      await store.put(getMatchHeartbeatKey(match.id, playerId), String(now));
+    } catch {
+      // A heartbeat is only a liveness hint; never fail the battle sync because it could not be saved.
+    }
+  }
+};
+
+const readMatchHeartbeat = async (env, match, playerId) => {
+  const store = getSessionStore(env);
+  if (!store || !match?.id || !playerId) {
+    return match.lastSeenByPlayerId?.[playerId];
+  }
+  try {
+    const savedValue = await store.get(getMatchHeartbeatKey(match.id, playerId));
+    const savedLastSeen = savedValue === null ? NaN : Number(savedValue);
+    return Number.isFinite(savedLastSeen) ? savedLastSeen : match.lastSeenByPlayerId?.[playerId];
+  } catch {
+    return match.lastSeenByPlayerId?.[playerId];
+  }
 };
 
 const cancelMatchForDisconnect = (match, disconnectedPlayerId, now = Date.now()) => {
@@ -114,9 +143,9 @@ const cancelMatchForDisconnect = (match, disconnectedPlayerId, now = Date.now())
   return match;
 };
 
-const finishMatchIfOpponentTimedOut = (session, match, playerId, now = Date.now()) => {
+const finishMatchIfOpponentTimedOut = async (env, match, playerId, now = Date.now()) => {
   const opponentId = getOpponentId(match, playerId);
-  const opponentLastSeen = match.lastSeenByPlayerId?.[opponentId] ?? match.updatedAt ?? match.createdAt ?? now;
+  const opponentLastSeen = (await readMatchHeartbeat(env, match, opponentId)) ?? match.updatedAt ?? match.createdAt ?? now;
   if (now - opponentLastSeen > matchPlayerTimeoutMs) {
     cancelMatchForDisconnect(match, opponentId, now);
   }
@@ -227,9 +256,16 @@ export async function onRequestPost({ request, env }) {
       return json({ ...session, matchStatus: "missing" });
     }
 
-    touchMatchPlayer(match, playerId, now);
-    finishMatchIfOpponentTimedOut(session, match, playerId, now);
-    return json({ ...(await writeSession(env, session)), matchStatus: match.disconnectReason ? "disconnected" : match.finished ? "finished" : "matched", match });
+    await writeMatchHeartbeat(env, match, playerId, now);
+    await finishMatchIfOpponentTimedOut(env, match, playerId, now);
+    // Do not persist ordinary polling by rewriting the whole session: a stale getMatch
+    // write can overwrite a just-submitted skill in KV and leave the other player stuck
+    // on an old turn. Heartbeats are stored separately above, and the session is persisted
+    // only when the poll actually changes the match outcome, such as a disconnect timeout.
+    if (match.disconnectReason) {
+      return json({ ...(await writeSession(env, session)), matchStatus: "disconnected", match });
+    }
+    return json({ ...session, matchStatus: match.finished ? "finished" : "matched", match });
   }
 
   if (action === "leaveMatch") {
@@ -258,7 +294,7 @@ export async function onRequestPost({ request, env }) {
       return json({ ...session, matchStatus: "finished", match });
     }
     const now = Date.now();
-    touchMatchPlayer(match, playerId, now);
+    await writeMatchHeartbeat(env, match, playerId, now);
     if (Number.isInteger(payload?.expectedVersion) && payload.expectedVersion !== match.version) {
       return json({ ...session, matchStatus: "versionMismatch", match }, { status: 409 });
     }

@@ -7,6 +7,7 @@ const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
 const matchingPollMs = 1500;
+const matchSyncPollMs = 2000;
 const sessionRequestTimeoutMs = 8000;
 const sessionRetryDelayMs = 450;
 const resultReturnMs = 10000;
@@ -854,7 +855,7 @@ const syncMatch = async () => {
 
 const startMatchSync = () => {
   stopMatchSync();
-  battleState.matchSyncTimerId = window.setInterval(syncMatch, 1000);
+  battleState.matchSyncTimerId = window.setInterval(syncMatch, matchSyncPollMs);
 };
 
 const stopMatchSync = () => {
@@ -1201,7 +1202,8 @@ battleActions.addEventListener("click", (event) => {
   useSkill(button.dataset.skill);
 });
 
-window.addEventListener("pagehide", notifyPlayerDisconnected);
+// pagehide also fires for mobile tab/app switches and bfcache transitions, which made
+// active players look disconnected. Only send an explicit leave signal for real unloads.
 window.addEventListener("beforeunload", notifyPlayerDisconnected);
 
 window.addEventListener("load", async () => {
