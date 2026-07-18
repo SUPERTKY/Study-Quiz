@@ -15,6 +15,7 @@ const defaultSession = {
   eliminatedPlayerIds: [],
   waitingPlayers: [],
   matches: {},
+  updatedAt: 0,
 };
 
 let memorySession = defaultSession;
@@ -48,6 +49,7 @@ const normalizeSession = (session) => ({
         }))
     : [],
   matches: session?.matches && typeof session.matches === "object" ? session.matches : {},
+  updatedAt: Number.isFinite(session?.updatedAt) ? session.updatedAt : 0,
 });
 
 const readSession = async (env) => {
@@ -66,7 +68,7 @@ const readSession = async (env) => {
 };
 
 const writeSession = async (env, session) => {
-  const nextSession = normalizeSession(session);
+  const nextSession = normalizeSession({ ...session, updatedAt: Date.now() });
   const store = getSessionStore(env);
   if (store) {
     try {
@@ -431,14 +433,22 @@ const handlePost = async ({ request, env }) => {
   }
 
   if (action === "advanceRound") {
+    const originalTournamentId = session.tournamentId;
+    const originalRound = session.round;
     session.closingRound = true;
-    const closedSession = await writeSession(env, session);
+    await writeSession(env, session);
     await new Promise((resolve) => setTimeout(resolve, 5000));
-    closedSession.round += 1;
-    closedSession.closingRound = false;
-    closedSession.waitingPlayers = [];
-    closedSession.matches = {};
-    return json(await writeSession(env, closedSession));
+
+    const latestSession = await readSession(env);
+    if (!latestSession.hosted || latestSession.tournamentId !== originalTournamentId || latestSession.round !== originalRound) {
+      return json(latestSession);
+    }
+
+    latestSession.round += 1;
+    latestSession.closingRound = false;
+    latestSession.waitingPlayers = [];
+    latestSession.matches = {};
+    return json(await writeSession(env, latestSession));
   }
 
   const nextHosted = payload?.hosted === true;
