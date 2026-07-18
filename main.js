@@ -149,8 +149,12 @@ const loadMathQuestions = async () => {
   }
 };
 
+const isQuestionVisible = (question) => question.visible !== false;
+
 const getQuestionsByDifficulty = (difficulty) =>
-  battleState.mathQuestions.filter((question) => question.difficulty === difficulty && question.subject === "数学");
+  battleState.mathQuestions.filter(
+    (question) => question.difficulty === difficulty && question.subject === "数学" && isQuestionVisible(question),
+  );
 
 const shuffleArray = (items) => {
   const shuffled = [...items];
