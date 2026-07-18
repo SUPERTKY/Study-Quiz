@@ -128,6 +128,7 @@ const playOpeningAudio = () => {
 
 const setBattleMessage = (message) => {
   battleMessage.textContent = message;
+  battleMessage.hidden = message.length === 0;
 };
 
 const loadMathQuestions = async () => {
@@ -294,6 +295,7 @@ const updateSkillButtons = () => {
     const cooldown = battleState.cooldowns[skillKey] ?? 0;
     button.disabled = !isPlayerTurn || cooldown > 0 || battleState.opponentHp <= 0;
     button.classList.toggle("is-on-cooldown", cooldown > 0);
+    button.classList.toggle("is-unavailable", !isPlayerTurn && battleState.opponentHp > 0);
     button.title = cooldown > 0 ? `${skills[skillKey].name}は次の自分のターンまで使えません` : skills[skillKey].name;
   });
 };
@@ -370,8 +372,9 @@ const startPlayerTurn = () => {
   battleState.phase = "player";
   battleState.playerGuardReduction = 0;
   tickCooldownsAtPlayerTurnStart();
-  turnLabel.textContent = "自分のターン";
-  setBattleMessage("自分のターンです。バトルアイコンから技を選んでください。");
+  turnLabel.src = "assets/images/ui/Icon/your_turn.png";
+  turnLabel.alt = "自分のターン";
+  setBattleMessage("");
   updateGuardOverlay();
   updateSkillButtons();
   playAudioFromStart(turnStartAudio);
@@ -379,8 +382,9 @@ const startPlayerTurn = () => {
 
 const startOpponentTurn = () => {
   battleState.phase = "opponent";
-  turnLabel.textContent = "相手のターン";
-  setBattleMessage("相手のターンです。今は5秒待機します。");
+  turnLabel.src = "assets/images/ui/Icon/enemy_turn.png";
+  turnLabel.alt = "相手のターン";
+  setBattleMessage("");
   updateSkillButtons();
 
   window.setTimeout(() => {
@@ -393,7 +397,7 @@ const startOpponentTurn = () => {
 const finishBattleIfNeeded = () => {
   if (battleState.opponentHp <= 0) {
     battleState.phase = "finished";
-    turnLabel.textContent = "勝利";
+    turnLabel.alt = "勝利";
     setBattleMessage("相手のHPが0になりました。勝利です！");
     updateSkillButtons();
     return true;
@@ -401,7 +405,7 @@ const finishBattleIfNeeded = () => {
 
   if (battleState.playerHp <= 0) {
     battleState.phase = "finished";
-    turnLabel.textContent = "敗北";
+    turnLabel.alt = "敗北";
     setBattleMessage("自分のHPが0になりました。敗北です。");
     updateSkillButtons();
     return true;
@@ -552,4 +556,15 @@ window.addEventListener("load", () => {
       window.setTimeout(showNextScreen, fadeDurationMs);
     }, fadeStartDelayMs);
   }, openingDelayMs);
+});
+
+
+document.addEventListener("dragstart", (event) => {
+  if (event.target instanceof HTMLImageElement) {
+    event.preventDefault();
+  }
+});
+
+document.querySelectorAll("img").forEach((image) => {
+  image.draggable = false;
 });
