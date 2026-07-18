@@ -54,15 +54,25 @@ const readSession = async (env) => {
     return memorySession;
   }
 
-  const savedSession = await store.get(sessionKey, "json");
-  return normalizeSession(savedSession);
+  try {
+    const savedSession = await store.get(sessionKey, "json");
+    return normalizeSession(savedSession);
+  } catch {
+    // If KV is temporarily unavailable or contains malformed JSON, keep /api/session usable.
+    return memorySession;
+  }
 };
 
 const writeSession = async (env, session) => {
   const nextSession = normalizeSession(session);
   const store = getSessionStore(env);
   if (store) {
-    await store.put(sessionKey, JSON.stringify(nextSession));
+    try {
+      await store.put(sessionKey, JSON.stringify(nextSession));
+    } catch {
+      // Fall back to isolate memory instead of surfacing a 500 to clients during a match.
+      memorySession = nextSession;
+    }
   } else {
     memorySession = nextSession;
   }
@@ -185,10 +195,10 @@ const getOpponentId = (match, playerId) => match.playerIds.find((id) => id !== p
 
 const normalizeNumber = (value, fallback = 0) => (Number.isFinite(value) ? value : fallback);
 
-const requireAdmin = (payload, env) => {
+const requireAdmin = (payload, env = {}) => {
   const expectedPassword = env.ADMIN_PASSWORD ?? "";
   if (!expectedPassword) {
-    return { ok: false, response: json({ ok: false, error: "ADMIN_PASSWORD_NOT_CONFIGURED" }, { status: 500 }) };
+    return { ok: false, response: json({ ok: false, error: "ADMIN_PASSWORD_NOT_CONFIGURED" }, { status: 400 }) };
   }
 
   if (payload?.adminPassword !== expectedPassword) {
@@ -202,7 +212,7 @@ export async function onRequestGet({ env }) {
   return json(await readSession(env));
 }
 
-export async function onRequestPost({ request, env }) {
+const handlePost = async ({ request, env }) => {
   let payload;
   try {
     payload = await request.json();
@@ -417,4 +427,12 @@ export async function onRequestPost({ request, env }) {
     nextSession.closingRound = false;
   }
   return json(await writeSession(env, nextSession));
+};
+
+export async function onRequestPost(context) {
+  try {
+    return await handlePost(context);
+  } catch {
+    return json({ ...(await readSession(context?.env)), ok: false, error: "SESSION_TEMPORARILY_UNAVAILABLE" });
+  }
 }
