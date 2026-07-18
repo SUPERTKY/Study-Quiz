@@ -82,26 +82,28 @@ const writeSession = async (env, session) => {
 };
 
 
-const deleteMatchHeartbeats = async (env) => {
+const deleteMatchHeartbeats = async (env, { cursor, limit = 100 } = {}) => {
   const store = getSessionStore(env);
   if (!store?.list || !store?.delete) {
-    return 0;
+    return { deletedCount: 0, cursor: undefined, complete: true };
   }
 
-  let deletedCount = 0;
-  let cursor;
+  const safeLimit = Math.max(1, Math.min(100, Math.round(normalizeNumber(limit, 100))));
   try {
-    do {
-      const result = await store.list({ prefix: matchHeartbeatKeyPrefix, cursor });
-      const keys = Array.isArray(result?.keys) ? result.keys : [];
-      await Promise.all(keys.map((key) => store.delete(key.name)));
-      deletedCount += keys.length;
-      cursor = result?.list_complete ? undefined : result?.cursor;
-    } while (cursor);
+    const result = await store.list({ prefix: matchHeartbeatKeyPrefix, cursor, limit: safeLimit });
+    const keys = Array.isArray(result?.keys) ? result.keys : [];
+    for (const key of keys) {
+      await store.delete(key.name);
+    }
+    return {
+      deletedCount: keys.length,
+      cursor: result?.list_complete ? undefined : result?.cursor,
+      complete: result?.list_complete === true || !result?.cursor,
+    };
   } catch {
     // Cleanup is best-effort; do not block tournament administration if KV listing/deletion fails.
+    return { deletedCount: 0, cursor, complete: false };
   }
-  return deletedCount;
 };
 
 const maxHp = 120;
@@ -413,8 +415,8 @@ const handlePost = async ({ request, env }) => {
   }
 
   if (action === "cleanupMatchHeartbeats") {
-    const heartbeatKeysDeleted = await deleteMatchHeartbeats(env);
-    return json({ ...session, heartbeatKeysDeleted });
+    const cleanup = await deleteMatchHeartbeats(env, { cursor: payload?.cursor, limit: payload?.limit });
+    return json({ ...session, heartbeatKeysDeleted: cleanup.deletedCount, cleanupCursor: cleanup.cursor, cleanupComplete: cleanup.complete });
   }
 
   if (action === "resetTournamentNumber") {
