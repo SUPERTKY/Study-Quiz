@@ -154,11 +154,11 @@ const closePasswordGate = (authenticated) => {
   }
 };
 
-const authenticatePassword = async (password) => {
+const authenticatePassword = async (password, mode) => {
   const response = await fetch(authEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ password, mode }),
   });
 
   if (!response.ok) {
@@ -176,7 +176,7 @@ const handlePasswordSubmit = async (event) => {
   submitButton.disabled = true;
 
   try {
-    const authenticated = await authenticatePassword(passwordInput.value);
+    const authenticated = await authenticatePassword(passwordInput.value, authState.mode);
     if (!authenticated) {
       passwordError.textContent = "パスワードが違います。";
       passwordInput.select();
@@ -185,7 +185,8 @@ const handlePasswordSubmit = async (event) => {
 
     closePasswordGate(true);
   } catch (error) {
-    passwordError.textContent = "認証に失敗しました。Cloudflare のパスワード変数を確認してください。";
+    const variableName = authState.mode === "admin" ? "ADMIN_PASSWORD" : "PASSWORD";
+    passwordError.textContent = `認証に失敗しました。Cloudflare の ${variableName} 変数を確認してください。`;
   } finally {
     submitButton.disabled = false;
   }
