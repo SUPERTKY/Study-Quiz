@@ -3,6 +3,7 @@ const validSubjectKeys = new Set(["math", "japanese", "english", "science", "soc
 const waitingPlayerTimeoutMs = 30000;
 // Polling two clients through KV can be delayed or reordered, so keep disconnect detection conservative.
 const matchPlayerTimeoutMs = 10 * 60 * 1000;
+const matchHeartbeatTtlSeconds = 60 * 60;
 
 const defaultSession = {
   hosted: false,
@@ -117,7 +118,7 @@ const writeMatchHeartbeat = async (env, match, playerId, now = Date.now()) => {
   const store = getSessionStore(env);
   if (store && match?.id && playerId) {
     try {
-      await store.put(getMatchHeartbeatKey(match.id, playerId), String(now));
+      await store.put(getMatchHeartbeatKey(match.id, playerId), String(now), { expirationTtl: matchHeartbeatTtlSeconds });
     } catch {
       // A heartbeat is only a liveness hint; never fail the battle sync because it could not be saved.
     }
