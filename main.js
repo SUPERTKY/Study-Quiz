@@ -777,6 +777,25 @@ adminStopButton.addEventListener("click", async () => {
   }
 });
 
+adminGameForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(adminGameForm);
+  const nextSubjectKey = String(formData.get("subject") ?? "math");
+  battleState.selectedSubjectKey = subjects[nextSubjectKey] ? nextSubjectKey : "math";
+  battleState.hosted = true;
+  adminHostButton.disabled = true;
+  await loadQuestions();
+  saveGameSession();
+  updateSessionUi();
+  adminHostButton.disabled = false;
+});
+
+adminStopButton.addEventListener("click", () => {
+  battleState.hosted = false;
+  saveGameSession();
+  updateSessionUi();
+});
+
 adminBackButton.addEventListener("click", () => {
   adminScreen.hidden = true;
   if (!nextScreen.classList.contains("is-battle-starting")) {
