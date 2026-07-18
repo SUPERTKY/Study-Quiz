@@ -152,14 +152,24 @@ const loadMathQuestions = async () => {
 const getQuestionsByDifficulty = (difficulty) =>
   battleState.mathQuestions.filter((question) => question.difficulty === difficulty && question.subject === "数学");
 
-const shuffleQuestions = (questions) => {
-  const shuffled = [...questions];
+const shuffleArray = (items) => {
+  const shuffled = [...items];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
     [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
   }
   return shuffled;
 };
+
+const shuffleQuestions = (questions) => shuffleArray(questions);
+
+const getShuffledChoices = (question) =>
+  shuffleArray(
+    question.choices.map((choice, index) => ({
+      text: choice,
+      originalIndex: index,
+    })),
+  );
 
 const updateQuestionScore = () => {
   const session = battleState.questionSession;
@@ -185,15 +195,16 @@ const showQuestion = () => {
   questionText.textContent = question.question;
   questionChoices.innerHTML = "";
   answerFeedback.textContent = "";
-  question.choices.forEach((choice, index) => {
+  const shuffledChoices = getShuffledChoices(question);
+  shuffledChoices.forEach((choice) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "question-panel__choice";
-    button.textContent = choice;
-    button.dataset.choiceIndex = String(index);
+    button.textContent = choice.text;
+    button.dataset.choiceIndex = String(choice.originalIndex);
     questionChoices.append(button);
   });
-  questionChoices.classList.toggle("question-panel__choices--vertical", question.choices.some((choice) => choice.length > 16));
+  questionChoices.classList.toggle("question-panel__choices--vertical", shuffledChoices.some((choice) => choice.text.length > 16));
 };
 
 const finishQuestionSession = () => {
