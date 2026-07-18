@@ -291,6 +291,29 @@ img {
   transform: translateX(-50%);
 }
 
+
+.turn-panel__label.is-entering {
+  animation: your-turn-enter 900ms steps(1, end);
+}
+
+@keyframes your-turn-enter {
+  0%,
+  84% {
+    top: 50%;
+    left: 50%;
+    width: min(72vw, 560px);
+    transform: translate(-50%, -50%);
+  }
+
+  85%,
+  100% {
+    top: clamp(18px, 3vh, 34px);
+    left: 50%;
+    width: clamp(150px, 18vw, 240px);
+    transform: translateX(-50%);
+  }
+}
+
 .turn-panel__subject {
   position: absolute;
   top: clamp(12px, 2vh, 24px);

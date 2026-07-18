@@ -374,6 +374,9 @@ const startPlayerTurn = () => {
   tickCooldownsAtPlayerTurnStart();
   turnLabel.src = "assets/images/ui/Icon/your_turn.png";
   turnLabel.alt = "自分のターン";
+  turnLabel.classList.remove("is-entering");
+  void turnLabel.offsetWidth;
+  turnLabel.classList.add("is-entering");
   setBattleMessage("");
   updateGuardOverlay();
   updateSkillButtons();
@@ -382,6 +385,7 @@ const startPlayerTurn = () => {
 
 const startOpponentTurn = () => {
   battleState.phase = "opponent";
+  turnLabel.classList.remove("is-entering");
   turnLabel.src = "assets/images/ui/Icon/enemy_turn.png";
   turnLabel.alt = "相手のターン";
   setBattleMessage("");
@@ -567,4 +571,8 @@ document.addEventListener("dragstart", (event) => {
 
 document.querySelectorAll("img").forEach((image) => {
   image.draggable = false;
+});
+
+turnLabel.addEventListener("animationend", () => {
+  turnLabel.classList.remove("is-entering");
 });
