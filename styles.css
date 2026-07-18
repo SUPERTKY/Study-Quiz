@@ -896,3 +896,109 @@ img {
 .next-screen.is-battle-starting .session-notice {
   opacity: 0;
 }
+
+
+.answer-feedback-icon {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  width: clamp(56px, 9vw, 96px);
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.2);
+}
+
+.answer-feedback-icon.is-playing {
+  animation: answer-icon-pop 260ms ease-out;
+}
+
+@keyframes answer-icon-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+  42% { opacity: 1; transform: translate(-50%, -50%) scale(1.35); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.18); }
+}
+
+.turn-panel__label.is-hidden-before-start {
+  opacity: 0;
+}
+
+.turn-roulette {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.turn-roulette.is-playing {
+  opacity: 1;
+}
+
+.turn-roulette img {
+  width: min(78vw, 620px);
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.55));
+  animation: roulette-pulse 160ms linear infinite;
+}
+
+@keyframes roulette-pulse {
+  0%, 100% { transform: scale(0.96) rotate(-1deg); }
+  50% { transform: scale(1.06) rotate(1deg); }
+}
+
+.battle-character.is-falling {
+  animation: defeated-fade 1300ms ease-in forwards;
+}
+
+@keyframes defeated-fade {
+  0% { opacity: 1; filter: none; }
+  100% { opacity: 0; filter: blur(4px) grayscale(1); transform: translateY(-50%) scale(0.88); }
+}
+
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.result-overlay img {
+  width: min(82vw, 760px);
+  max-height: 72vh;
+  object-fit: contain;
+  animation: result-breath 900ms ease-in-out infinite;
+  filter: drop-shadow(0 20px 34px rgba(0, 0, 0, 0.62));
+}
+
+@keyframes result-breath {
+  0%, 100% { transform: scale(0.96); }
+  50% { transform: scale(1.08); }
+}
+
+.admin-screen__round,
+.admin-screen__reset {
+  min-width: 230px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #8fd3ff;
+  color: #17130a;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-screen__round:disabled,
+.admin-screen__reset:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.admin-screen__reset {
+  background: #ffd08f;
+}
