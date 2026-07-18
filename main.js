@@ -328,6 +328,15 @@ const loadRemoteSession = async () => {
   }
 };
 
+
+const sessionErrorMessages = {
+  GAME_SESSION_KV_NOT_CONFIGURED: "GAME_SESSION_KV が未設定です。Cloudflare Pages の KV namespace bindings に同名の KV バインディングを追加してください。",
+  GAME_SESSION_KV_IS_NOT_KV_BINDING: "GAME_SESSION_KV が通常の環境変数として設定されています。Environment variables ではなく KV namespace bindings に設定してください。",
+  GAME_SESSION_IS_NOT_KV_BINDING: "GAME_SESSION が通常の環境変数として設定されています。Environment variables ではなく KV namespace bindings に設定してください。",
+};
+
+const getSessionErrorMessage = (error, fallback) => sessionErrorMessages[error?.result?.error] ?? fallback;
+
 const saveRemoteSession = async (session) => {
   applyRemoteSession(
     await fetchSessionJson(sessionEndpoint, {
@@ -1124,7 +1133,7 @@ adminGameForm.addEventListener("submit", async (event) => {
     await saveRemoteSession({ hosted: true, selectedSubjectKey: battleState.selectedSubjectKey });
     await loadQuestions();
   } catch (error) {
-    adminStatus.textContent = "開催状態の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。";
+    adminStatus.textContent = getSessionErrorMessage(error, "開催状態の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。");
   } finally {
     adminHostButton.disabled = false;
   }
@@ -1136,7 +1145,7 @@ adminStopButton.addEventListener("click", async () => {
   try {
     await saveRemoteSession({ hosted: false, selectedSubjectKey: battleState.selectedSubjectKey });
   } catch (error) {
-    adminStatus.textContent = "開催終了の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。";
+    adminStatus.textContent = getSessionErrorMessage(error, "開催終了の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。");
   } finally {
     adminStopButton.disabled = false;
   }

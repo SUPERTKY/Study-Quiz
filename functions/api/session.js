@@ -29,7 +29,28 @@ const json = (body, init = {}) =>
     },
   });
 
-const getSessionStore = (env = {}) => env.GAME_SESSION_KV ?? env.GAME_SESSION;
+const kvBindingNames = ["GAME_SESSION_KV", "GAME_SESSION"];
+
+class SessionStoreError extends Error {
+  constructor(code, message = code) {
+    super(message);
+    this.name = "SessionStoreError";
+    this.code = code;
+  }
+}
+
+const getSessionStore = (env = {}) => {
+  const bindingName = kvBindingNames.find((name) => env[name] !== undefined && env[name] !== null);
+  if (!bindingName) {
+    return null;
+  }
+
+  const store = env[bindingName];
+  if (typeof store?.get !== "function" || typeof store?.put !== "function") {
+    throw new SessionStoreError(`${bindingName}_IS_NOT_KV_BINDING`);
+  }
+  return store;
+};
 
 const normalizeSession = (session) => ({
   hosted: session?.hosted === true,
@@ -53,7 +74,12 @@ const normalizeSession = (session) => ({
 });
 
 const readSession = async (env) => {
-  const store = getSessionStore(env);
+  let store;
+  try {
+    store = getSessionStore(env);
+  } catch {
+    return memorySession;
+  }
   if (!store) {
     return memorySession;
   }
@@ -69,7 +95,16 @@ const readSession = async (env) => {
 
 const writeSession = async (env, session, { requireStoreWrite = false } = {}) => {
   const nextSession = normalizeSession({ ...session, updatedAt: Date.now() });
-  const store = getSessionStore(env);
+  let store;
+  try {
+    store = getSessionStore(env);
+  } catch (error) {
+    if (requireStoreWrite) {
+      throw error;
+    }
+    memorySession = nextSession;
+    return nextSession;
+  }
   if (store) {
     try {
       await store.put(sessionKey, JSON.stringify(nextSession));
@@ -91,7 +126,12 @@ const writeSession = async (env, session, { requireStoreWrite = false } = {}) =>
 
 
 const deleteMatchHeartbeats = async (env, { cursor, limit = 100 } = {}) => {
-  const store = getSessionStore(env);
+  let store;
+  try {
+    store = getSessionStore(env);
+  } catch {
+    return { deletedCount: 0, cursor: undefined, complete: true };
+  }
   if (!store?.list || !store?.delete) {
     return { deletedCount: 0, cursor: undefined, complete: true };
   }
@@ -149,7 +189,12 @@ const touchMatchPlayer = (match, playerId, now = Date.now()) => {
 
 const writeMatchHeartbeat = async (env, match, playerId, now = Date.now()) => {
   touchMatchPlayer(match, playerId, now);
-  const store = getSessionStore(env);
+  let store;
+  try {
+    store = getSessionStore(env);
+  } catch {
+    store = null;
+  }
   if (store && match?.id && playerId) {
     try {
       await store.put(getMatchHeartbeatKey(match.id, playerId), String(now), { expirationTtl: matchHeartbeatTtlSeconds });
@@ -160,7 +205,12 @@ const writeMatchHeartbeat = async (env, match, playerId, now = Date.now()) => {
 };
 
 const readMatchHeartbeat = async (env, match, playerId) => {
-  const store = getSessionStore(env);
+  let store;
+  try {
+    store = getSessionStore(env);
+  } catch {
+    store = null;
+  }
   if (!store || !match?.id || !playerId) {
     return match.lastSeenByPlayerId?.[playerId];
   }
@@ -480,12 +530,22 @@ const handlePost = async ({ request, env }) => {
   return json(await writeSession(env, nextSession, { requireStoreWrite: true }));
 };
 
+const getPublicErrorCode = (error) => {
+  if (error instanceof SessionStoreError) {
+    return error.code;
+  }
+  if (error?.message === "GAME_SESSION_KV_NOT_CONFIGURED") {
+    return error.message;
+  }
+  return "SESSION_TEMPORARILY_UNAVAILABLE";
+};
+
 export async function onRequestPost(context) {
   try {
     return await handlePost(context);
-  } catch {
+  } catch (error) {
     return json(
-      { ...(await readSession(context?.env)), ok: false, error: "SESSION_TEMPORARILY_UNAVAILABLE" },
+      { ...(await readSession(context?.env)), ok: false, error: getPublicErrorCode(error) },
       { status: 500 },
     );
   }
