@@ -32,7 +32,16 @@ const normalizeSession = (session) => ({
   round: Number.isInteger(session?.round) ? session.round : 0,
   closingRound: session?.closingRound === true,
   eliminatedPlayerIds: Array.isArray(session?.eliminatedPlayerIds) ? session.eliminatedPlayerIds.filter(Boolean) : [],
-  waitingPlayers: Array.isArray(session?.waitingPlayers) ? session.waitingPlayers.filter((player) => player?.id) : [],
+  waitingPlayers: Array.isArray(session?.waitingPlayers)
+    ? session.waitingPlayers
+        .filter((player) => player?.id)
+        .map((player) => ({
+          id: String(player.id),
+          joinedAt: Number.isFinite(player.joinedAt) ? player.joinedAt : 0,
+          tournamentId: Number.isInteger(player.tournamentId) ? player.tournamentId : session?.tournamentId,
+          round: Number.isInteger(player.round) ? player.round : session?.round,
+        }))
+    : [],
   matches: session?.matches && typeof session.matches === "object" ? session.matches : {},
 });
 
@@ -61,10 +70,28 @@ const maxHp = 120;
 
 const randomId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
+const isCurrentRoundPlayer = (session, player) =>
+  player?.id && player.tournamentId === session.tournamentId && player.round === session.round;
+
+const isCurrentRoundMatch = (session, match) =>
+  match &&
+  match.tournamentId === session.tournamentId &&
+  match.round === session.round &&
+  match.finished !== true;
+
+const pruneCurrentRoundWaitingPlayers = (session, playerIdToExclude = "") => {
+  const uniquePlayers = new Map();
+  session.waitingPlayers
+    .filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerIdToExclude)
+    .forEach((player) => uniquePlayers.set(player.id, player));
+  session.waitingPlayers = Array.from(uniquePlayers.values());
+};
+
 const createMatch = (session, playerId, opponentId) => {
   const firstPlayerId = Math.random() < 0.5 ? playerId : opponentId;
   const match = {
     id: randomId(),
+    tournamentId: session.tournamentId,
     round: session.round,
     playerIds: [playerId, opponentId],
     firstPlayerId,
@@ -128,12 +155,13 @@ export async function onRequestPost({ request, env }) {
     if (session.eliminatedPlayerIds.includes(playerId)) {
       return json({ ...session, matchStatus: "eliminated" });
     }
-    const existingMatch = Object.values(session.matches).find((match) => match.playerIds?.includes(playerId) && !match.finished);
+    pruneCurrentRoundWaitingPlayers(session, playerId);
+    const existingMatch = Object.values(session.matches).find((match) => isCurrentRoundMatch(session, match) && match.playerIds?.includes(playerId));
     if (existingMatch) {
       return json({ ...session, matchStatus: "matched", match: existingMatch });
     }
 
-    const otherPlayers = session.waitingPlayers.filter((player) => player.id !== playerId);
+    const otherPlayers = session.waitingPlayers.filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerId);
     if (otherPlayers.length > 0) {
       const opponent = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
       session.waitingPlayers = session.waitingPlayers.filter((player) => player.id !== playerId && player.id !== opponent.id);
@@ -141,7 +169,10 @@ export async function onRequestPost({ request, env }) {
       return json({ ...(await writeSession(env, session)), matchStatus: "matched", match });
     }
 
-    session.waitingPlayers = [...session.waitingPlayers.filter((player) => player.id !== playerId), { id: playerId, joinedAt: Date.now() }];
+    session.waitingPlayers = [
+      ...session.waitingPlayers.filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerId),
+      { id: playerId, joinedAt: Date.now(), tournamentId: session.tournamentId, round: session.round },
+    ];
     return json({ ...(await writeSession(env, session)), matchStatus: "waiting" });
   }
 

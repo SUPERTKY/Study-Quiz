@@ -919,6 +919,7 @@ const beginMatchedBattle = async (match) => {
     window.clearInterval(battleState.matchingTimerId);
     battleState.matchingTimerId = null;
   }
+  battleState.phase = "roulette";
   setBattleMessage("マッチングしました！ 先攻・後攻を決めています。");
   await loadQuestions();
   battleScene.classList.add("is-visible");
@@ -933,6 +934,11 @@ const beginMatchedBattle = async (match) => {
 };
 
 const pollMatching = async () => {
+  if (!["idle", "matching"].includes(battleState.phase)) {
+    return;
+  }
+
+  battleState.phase = "matching";
   try {
     const session = await postSessionAction({ action: "joinMatch", playerId: battleState.playerId });
     applyRemoteSession(session);
@@ -945,11 +951,16 @@ const pollMatching = async () => {
       return;
     }
     if (session.matchStatus === "matched" && session.match) {
+      if (battleState.matchingTimerId) {
+        window.clearInterval(battleState.matchingTimerId);
+        battleState.matchingTimerId = null;
+      }
       await beginMatchedBattle(session.match);
       return;
     }
     setBattleMessage("相手を探しています。同じタイミングで探している人とランダムにマッチングします。");
   } catch (error) {
+    battleState.phase = "idle";
     setBattleMessage("マッチング状態の確認に失敗しました。通信を確認してください。");
   }
 };
@@ -978,7 +989,7 @@ const startBattleScene = async () => {
   resetBattle();
   setBattleMessage("相手を探しています...");
   await pollMatching();
-  if (!battleState.matchingTimerId && battleState.phase === "idle") {
+  if (!battleState.matchingTimerId && battleState.phase === "matching") {
     battleState.matchingTimerId = window.setInterval(pollMatching, matchingPollMs);
   }
 };
