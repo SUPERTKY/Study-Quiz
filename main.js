@@ -756,8 +756,13 @@ const applyRemoteMatch = (match) => {
   }
   const opponentId = match.playerIds.find((id) => id !== battleState.playerId);
   const previousVersion = battleState.lastMatchVersion;
+  const incomingVersion = Number.isInteger(match.version) ? match.version : previousVersion;
+  if (incomingVersion < previousVersion) {
+    return;
+  }
+
   battleState.match = match;
-  battleState.lastMatchVersion = Number.isInteger(match.version) ? match.version : previousVersion;
+  battleState.lastMatchVersion = incomingVersion;
   battleState.playerHp = match.hpByPlayerId?.[battleState.playerId] ?? battleState.playerHp;
   battleState.opponentHp = match.hpByPlayerId?.[opponentId] ?? battleState.opponentHp;
   battleState.playerGuardReduction = match.guardByPlayerId?.[battleState.playerId] ?? 0;
