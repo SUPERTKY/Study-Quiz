@@ -9,6 +9,7 @@ const maxHp = 120;
 const matchingPollMs = 1000;
 const matchSyncPollMs = 1000;
 const turnHandoffWatchdogMs = 9000;
+const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
 const sessionRequestTimeoutMs = 12000;
 const sessionRetryDelayMs = 350;
 const sessionRetryJitterMs = 250;
@@ -970,9 +971,8 @@ const applyRemoteMatch = (match) => {
 
   if (match.finished) {
     stopMatchSync();
-    if (match.disconnectReason) {
-      forceReturnToTitle("接続が切れたため、学習セッションを終了しました。もう一度参加してください。");
-      return;
+    if (match.disconnectReason && match.winnerPlayerId === battleState.playerId) {
+      setBattleMessage(opponentAbsenceWinMessage);
     }
     showResult(match.winnerPlayerId === battleState.playerId ? "win" : "lose");
     return;
@@ -998,7 +998,7 @@ const syncMatch = async () => {
     if (session.match) {
       applyRemoteMatch(session.match);
     } else if (["missing", "disconnected"].includes(session.matchStatus)) {
-      forceReturnToTitle("接続が切れたため、学習セッションを終了しました。もう一度参加してください。");
+      forceReturnToTitle("相手との接続状態を確認できませんでした。もう一度参加してください。");
     }
   } catch (error) {
     setBattleMessage("相手との同期に失敗しました。自動で再接続しています...");

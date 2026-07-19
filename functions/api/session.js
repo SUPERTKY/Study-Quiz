@@ -1,9 +1,9 @@
 const sessionKey = "current";
 const validSubjectKeys = new Set(["math", "japanese", "english", "science", "social"]);
 const waitingPlayerTimeoutMs = 90000;
-// Polling two clients through KV can be delayed or reordered, so keep disconnect detection conservative.
-// Give mobile browsers, throttled tabs, and temporary network drops enough room to reconnect.
-const matchPlayerTimeoutMs = 20 * 60 * 1000;
+// Active matches use heartbeat keys separate from the shared session blob.
+// If an opponent stops polling, resolve the match as a forfeit instead of leaving a ghost opponent.
+const matchPlayerTimeoutMs = 45 * 1000;
 const matchHeartbeatTtlSeconds = 60 * 60;
 const matchHeartbeatKeyPrefix = "match:";
 
@@ -224,26 +224,30 @@ const readMatchHeartbeat = async (env, match, playerId) => {
   }
 };
 
-const cancelMatchForDisconnect = (match, disconnectedPlayerId, now = Date.now()) => {
+const finishMatchByForfeit = (session, match, forfeitingPlayerId, now = Date.now()) => {
   if (!match || match.finished) {
     return match;
   }
 
+  const winnerPlayerId = getOpponentId(match, forfeitingPlayerId);
   match.finished = true;
-  match.winnerPlayerId = null;
-  match.loserPlayerId = null;
-  match.disconnectedPlayerId = disconnectedPlayerId;
-  match.disconnectReason = "playerDisconnected";
+  match.winnerPlayerId = winnerPlayerId ?? null;
+  match.loserPlayerId = forfeitingPlayerId;
+  match.disconnectedPlayerId = forfeitingPlayerId;
+  match.disconnectReason = "playerForfeited";
   match.version = (Number.isInteger(match.version) ? match.version : 0) + 1;
   match.updatedAt = now;
+  if (forfeitingPlayerId && !session.eliminatedPlayerIds.includes(forfeitingPlayerId)) {
+    session.eliminatedPlayerIds.push(forfeitingPlayerId);
+  }
   return match;
 };
 
-const finishMatchIfOpponentTimedOut = async (env, match, playerId, now = Date.now()) => {
+const finishMatchIfOpponentTimedOut = async (env, session, match, playerId, now = Date.now()) => {
   const opponentId = getOpponentId(match, playerId);
   const opponentLastSeen = (await readMatchHeartbeat(env, match, opponentId)) ?? match.updatedAt ?? match.createdAt ?? now;
   if (now - opponentLastSeen > matchPlayerTimeoutMs) {
-    cancelMatchForDisconnect(match, opponentId, now);
+    finishMatchByForfeit(session, match, opponentId, now);
   }
   return match;
 };
@@ -361,15 +365,15 @@ const handlePost = async ({ request, env }) => {
     }
 
     await writeMatchHeartbeat(env, match, playerId, now);
-    await finishMatchIfOpponentTimedOut(env, match, playerId, now);
+    await finishMatchIfOpponentTimedOut(env, session, match, playerId, now);
     // Do not persist ordinary polling by rewriting the whole session: a stale getMatch
     // write can overwrite a just-submitted skill in KV and leave the other player stuck
     // on an old turn. Heartbeats are stored separately above, and the session is persisted
     // only when the poll actually changes the match outcome, such as a disconnect timeout.
-    if (match.disconnectReason) {
-      return json({ ...(await writeSession(env, session)), matchStatus: "disconnected", match });
+    if (match.finished) {
+      return json({ ...(match.disconnectReason ? await writeSession(env, session) : session), matchStatus: "finished", match });
     }
-    return json({ ...session, matchStatus: match.finished ? "finished" : "matched", match });
+    return json({ ...session, matchStatus: "matched", match });
   }
 
   if (action === "leaveMatch") {
@@ -377,8 +381,8 @@ const handlePost = async ({ request, env }) => {
     const matchId = String(payload?.matchId ?? "");
     session.waitingPlayers = session.waitingPlayers.filter((player) => player.id !== playerId);
     const match = session.matches[matchId] ?? Object.values(session.matches).find((item) => isCurrentRoundMatch(session, item) && item.playerIds?.includes(playerId));
-    if (match?.playerIds?.includes(playerId) && match.finished === true) {
-      cancelMatchForDisconnect(match, playerId);
+    if (match?.playerIds?.includes(playerId) && match.finished !== true) {
+      finishMatchByForfeit(session, match, playerId);
     }
     return json(await writeSession(env, session));
   }
