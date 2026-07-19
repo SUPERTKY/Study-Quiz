@@ -12,6 +12,7 @@ const sessionRequestTimeoutMs = 8000;
 const sessionRetryDelayMs = 450;
 const resultReturnMs = 10000;
 const questionDurationSeconds = 20;
+const skillBonusAccuracyThreshold = 65;
 const feedbackDurationMs = 260;
 const authEndpoint = "/api/auth";
 const sessionEndpoint = "/api/session";
@@ -624,6 +625,20 @@ const showQuestion = () => {
   questionChoices.classList.toggle("question-panel__choices--vertical", shuffledChoices.some((choice) => choice.text.length > 16));
 };
 
+const getQuestionAccuracy = (correct, wrong) => {
+  const answeredCount = correct + wrong;
+  return answeredCount > 0 ? (correct / answeredCount) * 100 : 0;
+};
+
+const getSkillEffectivePoint = (correct, wrong) => {
+  const accuracy = getQuestionAccuracy(correct, wrong);
+  if (accuracy <= skillBonusAccuracyThreshold) {
+    return 0;
+  }
+
+  return Math.max(0, correct - wrong * 0.5);
+};
+
 const finishQuestionSession = () => {
   const session = battleState.questionSession;
   if (!session || session.finished) {
@@ -635,7 +650,7 @@ const finishQuestionSession = () => {
   hideAnswerIcon();
   questionPanel.hidden = true;
   battleState.phase = "resolving";
-  const effectivePoint = Math.max(0, session.correct - session.wrong * 0.5);
+  const effectivePoint = getSkillEffectivePoint(session.correct, session.wrong);
   applySkillResult(session.skillKey, effectivePoint, session.correct, session.wrong);
   battleState.questionSession = null;
 };
@@ -926,7 +941,9 @@ const finishBattleIfNeeded = () => {
 const applySkillResult = async (skillKey, effectivePoint, correct, wrong) => {
   const skill = skills[skillKey];
   const effectValue = Math.round(skill.base + effectivePoint * skill.perPoint);
-  const scoreText = `正解${correct}・誤答${wrong}・有効得点${effectivePoint}`;
+  const accuracy = getQuestionAccuracy(correct, wrong);
+  const bonusBlocked = correct + wrong > 0 && accuracy <= skillBonusAccuracyThreshold;
+  const scoreText = `正解${correct}・誤答${wrong}・正解率${Math.round(accuracy)}%・有効得点${effectivePoint}${bonusBlocked ? "（65%以下のため追加強化なし）" : ""}`;
   let message = "";
   let guardReduction = 0;
 
