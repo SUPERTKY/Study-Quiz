@@ -13,6 +13,7 @@ const sessionRequestTimeoutMs = 12000;
 const sessionRetryDelayMs = 350;
 const sessionRetryJitterMs = 250;
 const resultReturnMs = 10000;
+const battleAudioFadeOutMs = 1300;
 const questionDurationSeconds = 20;
 const skillBonusAccuracyThreshold = 65;
 const feedbackDurationMs = 260;
@@ -276,6 +277,32 @@ const stopBattleAudio = () => {
 
   battleAudio.pause();
   battleAudio.currentTime = 0;
+  battleAudio.volume = 1;
+};
+
+const fadeOutBattleAudio = (durationMs = battleAudioFadeOutMs) => {
+  if (!battleAudio || battleAudio.paused) {
+    return;
+  }
+
+  const startingVolume = battleAudio.volume;
+  const startedAt = performance.now();
+
+  const fadeFrame = (currentTime) => {
+    const progress = Math.min((currentTime - startedAt) / durationMs, 1);
+    battleAudio.volume = startingVolume * (1 - progress);
+
+    if (progress < 1 && !battleAudio.paused) {
+      window.requestAnimationFrame(fadeFrame);
+      return;
+    }
+
+    battleAudio.pause();
+    battleAudio.currentTime = 0;
+    battleAudio.volume = 1;
+  };
+
+  window.requestAnimationFrame(fadeFrame);
 };
 
 const playBattleAudio = () => {
@@ -284,6 +311,7 @@ const playBattleAudio = () => {
   }
 
   battleAudio.loop = true;
+  battleAudio.volume = 1;
   playAudioFromStart(battleAudio);
 };
 
@@ -521,9 +549,13 @@ const forceReturnToTitle = (message = "最初の画面に戻りました。") =>
 const showResult = async (result) => {
   battleState.phase = "finished";
   stopTurnHandoffWatchdog();
-  stopBattleAudio();
-  updateSkillButtons();
   const won = result === "win";
+  if (won) {
+    stopBattleAudio();
+  } else {
+    fadeOutBattleAudio();
+  }
+  updateSkillButtons();
   const defeatedCharacter = won ? opponentCharacter : playerCharacter;
   playAudioFromStart(fallOverAudio);
   defeatedCharacter.classList.add("is-falling");
