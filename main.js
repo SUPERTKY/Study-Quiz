@@ -12,6 +12,7 @@ const sessionRequestTimeoutMs = 8000;
 const sessionRetryDelayMs = 450;
 const resultReturnMs = 10000;
 const questionDurationSeconds = 20;
+const skillBonusAccuracyThreshold = 65;
 const feedbackDurationMs = 260;
 const authEndpoint = "/api/auth";
 const sessionEndpoint = "/api/session";
@@ -146,6 +147,7 @@ const battleState = {
   tournamentId: 0,
   round: 0,
   closingRound: false,
+  adminBusy: false,
   playerId: localStorage.getItem("schoolRpgPlayerId") || crypto.randomUUID(),
   match: null,
   lastMatchVersion: -1,
@@ -284,6 +286,18 @@ const setBattleMessage = (message) => {
 
 const getSelectedSubject = () => subjects[battleState.selectedSubjectKey] ?? subjects.math;
 
+const updateAdminButtonStates = () => {
+  if (adminHostButton) {
+    adminHostButton.disabled = battleState.adminBusy || battleState.hosted;
+  }
+  if (adminStopButton) {
+    adminStopButton.disabled = battleState.adminBusy || !battleState.hosted;
+  }
+  if (adminRoundButton) {
+    adminRoundButton.disabled = battleState.adminBusy || !battleState.hosted;
+  }
+};
+
 const updateSessionUi = () => {
   const subject = getSelectedSubject();
   const statusText = battleState.hosted
@@ -303,6 +317,7 @@ const updateSessionUi = () => {
   if (adminStatus) {
     adminStatus.textContent = statusText;
   }
+  updateAdminButtonStates();
   const selectedSubjectInput = adminGameForm?.querySelector(`input[name="subject"][value="${battleState.selectedSubjectKey}"]`);
   if (selectedSubjectInput) {
     selectedSubjectInput.checked = true;
@@ -624,6 +639,20 @@ const showQuestion = () => {
   questionChoices.classList.toggle("question-panel__choices--vertical", shuffledChoices.some((choice) => choice.text.length > 16));
 };
 
+const getQuestionAccuracy = (correct, wrong) => {
+  const answeredCount = correct + wrong;
+  return answeredCount > 0 ? (correct / answeredCount) * 100 : 0;
+};
+
+const getSkillEffectivePoint = (correct, wrong) => {
+  const accuracy = getQuestionAccuracy(correct, wrong);
+  if (accuracy <= skillBonusAccuracyThreshold) {
+    return 0;
+  }
+
+  return Math.max(0, correct - wrong * 0.5);
+};
+
 const finishQuestionSession = () => {
   const session = battleState.questionSession;
   if (!session || session.finished) {
@@ -635,7 +664,7 @@ const finishQuestionSession = () => {
   hideAnswerIcon();
   questionPanel.hidden = true;
   battleState.phase = "resolving";
-  const effectivePoint = Math.max(0, session.correct - session.wrong * 0.5);
+  const effectivePoint = getSkillEffectivePoint(session.correct, session.wrong);
   applySkillResult(session.skillKey, effectivePoint, session.correct, session.wrong);
   battleState.questionSession = null;
 };
@@ -926,7 +955,9 @@ const finishBattleIfNeeded = () => {
 const applySkillResult = async (skillKey, effectivePoint, correct, wrong) => {
   const skill = skills[skillKey];
   const effectValue = Math.round(skill.base + effectivePoint * skill.perPoint);
-  const scoreText = `正解${correct}・誤答${wrong}・有効得点${effectivePoint}`;
+  const accuracy = getQuestionAccuracy(correct, wrong);
+  const bonusBlocked = correct + wrong > 0 && accuracy <= skillBonusAccuracyThreshold;
+  const scoreText = `正解${correct}・誤答${wrong}・正解率${Math.round(accuracy)}%・有効得点${effectivePoint}${bonusBlocked ? "（65%以下のため追加強化なし）" : ""}`;
   let message = "";
   let guardReduction = 0;
 
@@ -1147,35 +1178,67 @@ adminButton.addEventListener("click", async () => {
 
 adminGameForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (battleState.hosted) {
+    updateSessionUi();
+    return;
+  }
+
   const formData = new FormData(adminGameForm);
   const nextSubjectKey = String(formData.get("subject") ?? "math");
   battleState.selectedSubjectKey = subjects[nextSubjectKey] ? nextSubjectKey : "math";
-  adminHostButton.disabled = true;
+  battleState.adminBusy = true;
+  updateAdminButtonStates();
   adminStatus.textContent = "オンラインに開催状態を保存しています...";
+  let failed = false;
   try {
     await saveRemoteSession({ hosted: true, selectedSubjectKey: battleState.selectedSubjectKey });
     await loadQuestions();
   } catch (error) {
+    failed = true;
     adminStatus.textContent = getSessionErrorMessage(error, "開催状態の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。");
   } finally {
-    adminHostButton.disabled = false;
+    battleState.adminBusy = false;
+    if (failed) {
+      updateAdminButtonStates();
+    } else {
+      updateSessionUi();
+    }
   }
 });
 
 adminStopButton.addEventListener("click", async () => {
-  adminStopButton.disabled = true;
+  if (!battleState.hosted) {
+    updateSessionUi();
+    return;
+  }
+
+  battleState.adminBusy = true;
+  updateAdminButtonStates();
   adminStatus.textContent = "オンラインに開催終了を保存しています...";
+  let failed = false;
   try {
     await saveRemoteSession({ hosted: false, selectedSubjectKey: battleState.selectedSubjectKey });
   } catch (error) {
+    failed = true;
     adminStatus.textContent = getSessionErrorMessage(error, "開催終了の保存に失敗しました。Cloudflare の GAME_SESSION_KV と ADMIN_PASSWORD を確認してください。");
   } finally {
-    adminStopButton.disabled = false;
+    battleState.adminBusy = false;
+    if (failed) {
+      updateAdminButtonStates();
+    } else {
+      updateSessionUi();
+    }
   }
 });
 
 adminRoundButton.addEventListener("click", async () => {
-  adminRoundButton.disabled = true;
+  if (!battleState.hosted) {
+    updateSessionUi();
+    return;
+  }
+
+  battleState.adminBusy = true;
+  updateAdminButtonStates();
   const nextRoundLabel = battleState.round === 0 ? "トーナメント2次開始" : `トーナメント${battleState.round + 2}次開始`;
   adminStatus.textContent = `5秒後に${nextRoundLabel}に進みます...`;
   try {
@@ -1185,7 +1248,8 @@ adminRoundButton.addEventListener("click", async () => {
   } catch (error) {
     adminStatus.textContent = "トーナメント進行に失敗しました。";
   } finally {
-    adminRoundButton.disabled = false;
+    battleState.adminBusy = false;
+    updateAdminButtonStates();
   }
 });
 
