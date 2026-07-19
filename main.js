@@ -95,6 +95,8 @@ const playerCharacter = document.querySelector(".battle-character--player");
 const opponentCharacter = document.querySelector(".battle-character--opponent");
 const playerGuardOverlay = document.querySelector("#playerGuardOverlay");
 const playerGuardValue = document.querySelector("#playerGuardValue");
+const opponentGuardOverlay = document.querySelector("#opponentGuardOverlay");
+const opponentGuardValue = document.querySelector("#opponentGuardValue");
 const skillButtons = Array.from(document.querySelectorAll(".battle-action"));
 
 const skills = {
@@ -812,14 +814,18 @@ const playRecoverEffect = (characterElement) => {
   characterElement.classList.add("is-recovering");
 };
 
-const updateGuardOverlay = () => {
-  if (!playerGuardOverlay || !playerGuardValue) {
+const setGuardOverlay = (overlay, valueElement, reduction) => {
+  if (!overlay || !valueElement) {
     return;
   }
 
-  const reduction = battleState.playerGuardReduction;
-  playerGuardOverlay.classList.toggle("is-active", reduction > 0);
-  playerGuardValue.textContent = `${reduction}%`;
+  overlay.classList.toggle("is-active", reduction > 0);
+  valueElement.textContent = `${reduction}%`;
+};
+
+const updateGuardOverlay = () => {
+  setGuardOverlay(playerGuardOverlay, playerGuardValue, battleState.playerGuardReduction);
+  setGuardOverlay(opponentGuardOverlay, opponentGuardValue, battleState.opponentGuardReduction);
 };
 
 const tickCooldownsAtPlayerTurnStart = () => {
@@ -871,11 +877,11 @@ const applyRemoteMatch = (match) => {
       playDamageEffect(target, match.lastAction.effectValue);
       playDamageAudio(match.lastAction.effectValue);
     }
-    if (match.lastAction.skillType === "recover" && actionByMe) {
-      playRecoverEffect(playerCharacter);
+    if (match.lastAction.skillType === "recover") {
+      playRecoverEffect(actionByMe ? playerCharacter : opponentCharacter);
       playAudioFromStart(recoverAudio);
     }
-    if (match.lastAction.skillType === "guard" && actionByMe) {
+    if (match.lastAction.skillType === "guard") {
       playAudioFromStart(guardAudio);
     }
   }
@@ -1027,6 +1033,7 @@ const resetBattle = () => {
   battleState.playerHp = maxHp;
   battleState.opponentHp = maxHp;
   battleState.playerGuardReduction = 0;
+  battleState.opponentGuardReduction = 0;
   battleState.cooldowns.recover = 0;
   battleState.cooldowns.guard = 0;
   battleState.cooldowns.burst = 0;
@@ -1100,6 +1107,9 @@ const pollMatching = async () => {
     if (session.matchStatus === "closed") {
       forceReturnToTitle("現在開催していません。");
       return;
+    }
+    if (session.matchStatus === "matchedPending") {
+      setBattleMessage("マッチングしました！ 相手の準備完了を待っています。");
     }
     if (session.matchStatus === "matched" && session.match) {
       if (battleState.matchingTimerId) {

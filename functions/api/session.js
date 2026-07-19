@@ -267,6 +267,7 @@ const createMatch = (session, playerId, opponentId) => {
       [opponentId]: { recover: 0, guard: 0, burst: 0 },
     },
     lastAction: null,
+    acknowledgedByPlayerId: { [playerId]: true, [opponentId]: false },
     processedActionIds: [],
     createdAt: Date.now(),
     lastSeenByPlayerId: { [playerId]: Date.now(), [opponentId]: Date.now() },
@@ -323,7 +324,14 @@ const handlePost = async ({ request, env }) => {
     pruneCurrentRoundWaitingPlayers(session, playerId, now);
     const existingMatch = Object.values(session.matches).find((match) => isCurrentRoundMatch(session, match) && match.playerIds?.includes(playerId));
     if (existingMatch) {
-      return json({ ...session, matchStatus: "matched", match: existingMatch });
+      existingMatch.acknowledgedByPlayerId ??= Object.fromEntries(existingMatch.playerIds.map((id) => [id, false]));
+      existingMatch.acknowledgedByPlayerId[playerId] = true;
+      const allPlayersAcknowledged = existingMatch.playerIds.every((id) => existingMatch.acknowledgedByPlayerId?.[id] === true);
+      if (allPlayersAcknowledged) {
+        existingMatch.updatedAt = now;
+        return json({ ...(await writeSession(env, session)), matchStatus: "matched", match: existingMatch });
+      }
+      return json({ ...(await writeSession(env, session)), matchStatus: "matchedPending", match: existingMatch });
     }
 
     const otherPlayers = session.waitingPlayers.filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerId);
@@ -331,7 +339,7 @@ const handlePost = async ({ request, env }) => {
       const opponent = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
       session.waitingPlayers = session.waitingPlayers.filter((player) => player.id !== playerId && player.id !== opponent.id);
       const match = createMatch(session, playerId, opponent.id);
-      return json({ ...(await writeSession(env, session)), matchStatus: "matched", match });
+      return json({ ...(await writeSession(env, session)), matchStatus: "matchedPending", match });
     }
 
     session.waitingPlayers = [

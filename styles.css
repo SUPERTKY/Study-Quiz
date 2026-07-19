@@ -456,6 +456,11 @@ img {
   transition: opacity 180ms ease;
 }
 
+.guard-overlay--opponent {
+  left: auto;
+  right: 9%;
+}
+
 .guard-overlay.is-active {
   opacity: 1;
 }
