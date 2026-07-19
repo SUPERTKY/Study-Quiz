@@ -40,17 +40,21 @@ class SessionStoreError extends Error {
   }
 }
 
+const isKvStore = (value) => typeof value?.get === "function" && typeof value?.put === "function";
+
+const getConfiguredBindingNames = (env = {}) => kvBindingNames.filter((name) => env[name] !== undefined && env[name] !== null);
+
 const getSessionStore = (env = {}) => {
-  const bindingName = kvBindingNames.find((name) => env[name] !== undefined && env[name] !== null);
-  if (!bindingName) {
-    return null;
+  const configuredBindingNames = getConfiguredBindingNames(env);
+  const validBindingName = configuredBindingNames.find((name) => isKvStore(env[name]));
+  if (validBindingName) {
+    return env[validBindingName];
   }
 
-  const store = env[bindingName];
-  if (typeof store?.get !== "function" || typeof store?.put !== "function") {
-    throw new SessionStoreError(`${bindingName}_IS_NOT_KV_BINDING`);
+  if (configuredBindingNames.length > 0) {
+    throw new SessionStoreError(`${configuredBindingNames[0]}_IS_NOT_KV_BINDING`);
   }
-  return store;
+  return null;
 };
 
 const normalizeSession = (session) => ({
@@ -560,14 +564,24 @@ const getPublicErrorCode = (error) => {
 };
 
 const getSessionStoreDiagnostic = (env = {}) => {
+  const bindings = Object.fromEntries(
+    kvBindingNames.map((name) => [
+      name,
+      {
+        configured: env[name] !== undefined && env[name] !== null,
+        isKvBinding: isKvStore(env[name]),
+      },
+    ]),
+  );
+
   try {
     const store = getSessionStore(env);
     if (!store) {
-      return { ok: false, error: "GAME_SESSION_KV_NOT_CONFIGURED" };
+      return { ok: false, error: "GAME_SESSION_KV_NOT_CONFIGURED", bindings };
     }
-    return { ok: true };
+    return { ok: true, bindings };
   } catch (error) {
-    return { ok: false, error: getPublicErrorCode(error) };
+    return { ok: false, error: getPublicErrorCode(error), bindings };
   }
 };
 
