@@ -6,8 +6,9 @@ const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
-const matchingPollMs = 1000;
+const matchingPollMs = 3000;
 const matchSyncPollMs = 1000;
+const matchHeartbeatWriteIntervalMs = 30000;
 const turnHandoffWatchdogMs = 9000;
 const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
 const sessionRequestTimeoutMs = 12000;
@@ -69,6 +70,8 @@ const adminHostButton = document.querySelector("#adminHostButton");
 const adminStopButton = document.querySelector("#adminStopButton");
 const adminRoundButton = document.querySelector("#adminRoundButton");
 const adminResetTournamentButton = document.querySelector("#adminResetTournamentButton");
+const adminDebugButton = document.querySelector("#adminDebugButton");
+const adminDebugOutput = document.querySelector("#adminDebugOutput");
 const passwordGate = document.querySelector("#passwordGate");
 const passwordForm = document.querySelector("#passwordForm");
 const passwordTitle = document.querySelector("#passwordTitle");
@@ -161,6 +164,7 @@ const battleState = {
   matchSyncTimerId: null,
   turnHandoffWatchdogTimerId: null,
   syncInFlight: false,
+  lastMatchHeartbeatAt: 0,
   matchingTimerId: null,
   rouletteRunId: 0,
   eliminatedTournamentId: Number(localStorage.getItem("schoolRpgEliminatedTournamentId") || "-1"),
@@ -351,6 +355,9 @@ const updateAdminButtonStates = () => {
   if (adminRoundButton) {
     adminRoundButton.disabled = battleState.adminBusy || !battleState.hosted;
   }
+  if (adminDebugButton) {
+    adminDebugButton.disabled = battleState.adminBusy;
+  }
 };
 
 const updateSessionUi = () => {
@@ -415,6 +422,24 @@ const sessionErrorMessages = {
 };
 
 const getSessionErrorMessage = (error, fallback) => sessionErrorMessages[error?.result?.error] ?? fallback;
+
+
+const showAdminDebugResult = (result) => {
+  if (!adminDebugOutput) {
+    return;
+  }
+  adminDebugOutput.hidden = false;
+  adminDebugOutput.textContent = JSON.stringify(
+    {
+      checkedAt: new Date().toISOString(),
+      url: window.location.href,
+      sessionEndpoint,
+      ...result,
+    },
+    null,
+    2,
+  );
+};
 
 const saveRemoteSession = async (session) => {
   applyRemoteSession(
@@ -993,7 +1018,17 @@ const syncMatch = async () => {
   }
   battleState.syncInFlight = true;
   try {
-    const session = await postSessionAction({ action: "getMatch", playerId: battleState.playerId, matchId: battleState.match.id });
+    const now = Date.now();
+    const shouldWriteHeartbeat = now - battleState.lastMatchHeartbeatAt >= matchHeartbeatWriteIntervalMs;
+    const session = await postSessionAction({
+      action: "getMatch",
+      playerId: battleState.playerId,
+      matchId: battleState.match.id,
+      heartbeat: shouldWriteHeartbeat,
+    });
+    if (shouldWriteHeartbeat) {
+      battleState.lastMatchHeartbeatAt = now;
+    }
     applyRemoteSession(session);
     if (session.match) {
       applyRemoteMatch(session.match);
@@ -1157,6 +1192,7 @@ const beginMatchedBattle = async (match) => {
   }
 
   hydrateRemoteMatch(match);
+  battleState.lastMatchHeartbeatAt = 0;
   if (battleState.matchingTimerId) {
     window.clearInterval(battleState.matchingTimerId);
     battleState.matchingTimerId = null;
@@ -1355,6 +1391,28 @@ adminRoundButton.addEventListener("click", async () => {
   }
 });
 
+
+adminDebugButton?.addEventListener("click", async () => {
+  battleState.adminBusy = true;
+  updateAdminButtonStates();
+  adminStatus.textContent = "KV の接続状態を確認しています...";
+  try {
+    const result = await postSessionAction({
+      action: "diagnoseSessionStore",
+      adminPassword: authState.adminPassword,
+    });
+    showAdminDebugResult(result);
+    adminStatus.textContent = result.activeBinding
+      ? `KV デバッグ完了: ${result.activeBinding} で読み書きできました。`
+      : "KV デバッグ完了: 詳細を下の表示で確認してください。";
+  } catch (error) {
+    showAdminDebugResult(error.result ?? { ok: false, message: error.message, status: error.status });
+    adminStatus.textContent = getSessionErrorMessage(error, "KV デバッグに失敗しました。詳細を下の表示で確認してください。");
+  } finally {
+    battleState.adminBusy = false;
+    updateAdminButtonStates();
+  }
+});
 
 adminResetTournamentButton.addEventListener("click", async () => {
   adminResetTournamentButton.disabled = true;

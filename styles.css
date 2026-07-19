@@ -987,7 +987,8 @@ img {
 }
 
 .admin-screen__round,
-.admin-screen__reset {
+.admin-screen__reset,
+.admin-screen__debug {
   min-width: 230px;
   padding: 10px 18px;
   border: 0;
@@ -999,11 +1000,31 @@ img {
 }
 
 .admin-screen__round:disabled,
-.admin-screen__reset:disabled {
+.admin-screen__reset:disabled,
+.admin-screen__debug:disabled {
   cursor: wait;
   opacity: 0.62;
 }
 
 .admin-screen__reset {
   background: #ffd08f;
+}
+
+.admin-screen__debug {
+  background: #c7b6ff;
+}
+
+.admin-screen__debug-output {
+  width: min(100%, 760px);
+  max-height: 220px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #f7f3dd;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
 }
