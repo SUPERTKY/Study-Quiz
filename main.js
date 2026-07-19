@@ -69,6 +69,8 @@ const adminHostButton = document.querySelector("#adminHostButton");
 const adminStopButton = document.querySelector("#adminStopButton");
 const adminRoundButton = document.querySelector("#adminRoundButton");
 const adminResetTournamentButton = document.querySelector("#adminResetTournamentButton");
+const adminDebugButton = document.querySelector("#adminDebugButton");
+const adminDebugOutput = document.querySelector("#adminDebugOutput");
 const passwordGate = document.querySelector("#passwordGate");
 const passwordForm = document.querySelector("#passwordForm");
 const passwordTitle = document.querySelector("#passwordTitle");
@@ -351,6 +353,9 @@ const updateAdminButtonStates = () => {
   if (adminRoundButton) {
     adminRoundButton.disabled = battleState.adminBusy || !battleState.hosted;
   }
+  if (adminDebugButton) {
+    adminDebugButton.disabled = battleState.adminBusy;
+  }
 };
 
 const updateSessionUi = () => {
@@ -415,6 +420,24 @@ const sessionErrorMessages = {
 };
 
 const getSessionErrorMessage = (error, fallback) => sessionErrorMessages[error?.result?.error] ?? fallback;
+
+
+const showAdminDebugResult = (result) => {
+  if (!adminDebugOutput) {
+    return;
+  }
+  adminDebugOutput.hidden = false;
+  adminDebugOutput.textContent = JSON.stringify(
+    {
+      checkedAt: new Date().toISOString(),
+      url: window.location.href,
+      sessionEndpoint,
+      ...result,
+    },
+    null,
+    2,
+  );
+};
 
 const saveRemoteSession = async (session) => {
   applyRemoteSession(
@@ -1355,6 +1378,28 @@ adminRoundButton.addEventListener("click", async () => {
   }
 });
 
+
+adminDebugButton?.addEventListener("click", async () => {
+  battleState.adminBusy = true;
+  updateAdminButtonStates();
+  adminStatus.textContent = "KV の接続状態を確認しています...";
+  try {
+    const result = await postSessionAction({
+      action: "diagnoseSessionStore",
+      adminPassword: authState.adminPassword,
+    });
+    showAdminDebugResult(result);
+    adminStatus.textContent = result.activeBinding
+      ? `KV デバッグ完了: ${result.activeBinding} で読み書きできました。`
+      : "KV デバッグ完了: 詳細を下の表示で確認してください。";
+  } catch (error) {
+    showAdminDebugResult(error.result ?? { ok: false, message: error.message, status: error.status });
+    adminStatus.textContent = getSessionErrorMessage(error, "KV デバッグに失敗しました。詳細を下の表示で確認してください。");
+  } finally {
+    battleState.adminBusy = false;
+    updateAdminButtonStates();
+  }
+});
 
 adminResetTournamentButton.addEventListener("click", async () => {
   adminResetTournamentButton.disabled = true;
