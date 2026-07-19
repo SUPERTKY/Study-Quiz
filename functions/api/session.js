@@ -6,6 +6,8 @@ const waitingPlayerTimeoutMs = 90000;
 const matchPlayerTimeoutMs = 20 * 60 * 1000;
 const matchHeartbeatTtlSeconds = 60 * 60;
 const matchHeartbeatKeyPrefix = "match:";
+const kvRealtimeConsistencyWarning =
+  "Cloudflare KV is eventually consistent, so rapid match synchronization can be delayed or reordered across clients. Use Durable Objects for reliable real-time battles.";
 
 const defaultSession = {
   hosted: false,
@@ -598,10 +600,20 @@ const getSessionStoreDiagnostic = async (env = {}) => {
   try {
     stores = getSessionStores(env);
   } catch (error) {
-    return { ok: false, error: getPublicErrorCode(error), bindings };
+    return {
+      ok: false,
+      error: getPublicErrorCode(error),
+      bindings,
+      consistencyWarning: kvRealtimeConsistencyWarning,
+    };
   }
   if (stores.length === 0) {
-    return { ok: false, error: "GAME_SESSION_KV_NOT_CONFIGURED", bindings };
+    return {
+      ok: false,
+      error: "GAME_SESSION_KV_NOT_CONFIGURED",
+      bindings,
+      consistencyWarning: kvRealtimeConsistencyWarning,
+    };
   }
 
   const diagnosticKey = `diagnostic:${crypto.randomUUID?.() ?? Date.now()}`;
@@ -613,14 +625,23 @@ const getSessionStoreDiagnostic = async (env = {}) => {
       await store.delete?.(diagnosticKey);
       bindings[name].readWriteOk = savedValue === "ok";
       if (bindings[name].readWriteOk) {
-        return { ok: true, activeBinding: name, bindings };
+        return { ok: true, activeBinding: name, bindings, consistencyWarning: kvRealtimeConsistencyWarning };
       }
+      bindings[name].readWriteError = "READ_AFTER_WRITE_MISMATCH";
     } catch (error) {
       lastError = error;
       bindings[name].readWriteOk = false;
+      bindings[name].readWriteError = error?.message ?? String(error);
+      bindings[name].readWriteErrorName = error?.name;
     }
   }
-  return { ok: false, error: "GAME_SESSION_KV_WRITE_FAILED", message: lastError?.message, bindings };
+  return {
+    ok: false,
+    error: "GAME_SESSION_KV_WRITE_FAILED",
+    message: lastError?.message,
+    bindings,
+    consistencyWarning: kvRealtimeConsistencyWarning,
+  };
 };
 
 export async function onRequestPost(context) {
