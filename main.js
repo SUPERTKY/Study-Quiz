@@ -550,11 +550,7 @@ const showResult = async (result) => {
   battleState.phase = "finished";
   stopTurnHandoffWatchdog();
   const won = result === "win";
-  if (won) {
-    stopBattleAudio();
-  } else {
-    fadeOutBattleAudio();
-  }
+  fadeOutBattleAudio();
   updateSkillButtons();
   const defeatedCharacter = won ? opponentCharacter : playerCharacter;
   playAudioFromStart(fallOverAudio);
