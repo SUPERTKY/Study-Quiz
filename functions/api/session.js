@@ -2,8 +2,8 @@ const sessionKey = "current";
 const validSubjectKeys = new Set(["math", "japanese", "english", "science", "social"]);
 const waitingPlayerTimeoutMs = 90000;
 // Active matches use heartbeat keys separate from the shared session blob.
-// If an opponent stops polling, resolve the match as a forfeit instead of leaving a ghost opponent.
-const matchPlayerTimeoutMs = 45 * 1000;
+// Resolve only sustained absence as a forfeit so temporary KV/read delays do not end matches immediately.
+const matchPlayerTimeoutMs = 3 * 60 * 1000;
 const matchHeartbeatTtlSeconds = 60 * 60;
 const matchHeartbeatKeyPrefix = "match:";
 
@@ -244,6 +244,11 @@ const finishMatchByForfeit = (session, match, forfeitingPlayerId, now = Date.now
 };
 
 const finishMatchIfOpponentTimedOut = async (env, session, match, playerId, now = Date.now()) => {
+  const allPlayersAcknowledged = match.playerIds?.every((id) => match.acknowledgedByPlayerId?.[id] === true);
+  if (!allPlayersAcknowledged) {
+    return match;
+  }
+
   const opponentId = getOpponentId(match, playerId);
   const opponentLastSeen = (await readMatchHeartbeat(env, match, opponentId)) ?? match.updatedAt ?? match.createdAt ?? now;
   if (now - opponentLastSeen > matchPlayerTimeoutMs) {
