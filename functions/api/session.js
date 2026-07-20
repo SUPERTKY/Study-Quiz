@@ -411,13 +411,21 @@ const handlePost = async ({ request, env }) => {
     const existingMatch = Object.values(session.matches).find((match) => isCurrentRoundMatch(session, match) && match.playerIds?.includes(playerId));
     if (existingMatch) {
       existingMatch.acknowledgedByPlayerId ??= Object.fromEntries(existingMatch.playerIds.map((id) => [id, false]));
+      const wasAcknowledged = existingMatch.acknowledgedByPlayerId[playerId] === true;
       existingMatch.acknowledgedByPlayerId[playerId] = true;
       const allPlayersAcknowledged = existingMatch.playerIds.every((id) => existingMatch.acknowledgedByPlayerId?.[id] === true);
       if (allPlayersAcknowledged) {
-        existingMatch.updatedAt = now;
-        return json({ ...(await writeSession(env, session)), matchStatus: "matched", match: existingMatch });
+        if (!existingMatch.allPlayersAcknowledgedAt) {
+          existingMatch.allPlayersAcknowledgedAt = now;
+          existingMatch.updatedAt = now;
+          return json({ ...(await writeSession(env, session)), matchStatus: "matched", match: existingMatch });
+        }
+        return json({ ...session, matchStatus: "matched", match: existingMatch });
       }
-      return json({ ...(await writeSession(env, session)), matchStatus: "matchedPending", match: existingMatch });
+      if (!wasAcknowledged) {
+        return json({ ...(await writeSession(env, session)), matchStatus: "matchedPending", match: existingMatch });
+      }
+      return json({ ...session, matchStatus: "matchedPending", match: existingMatch });
     }
 
     const otherPlayers = session.waitingPlayers.filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerId);
@@ -426,6 +434,11 @@ const handlePost = async ({ request, env }) => {
       session.waitingPlayers = session.waitingPlayers.filter((player) => player.id !== playerId && player.id !== opponent.id);
       const match = createMatch(session, playerId, opponent.id);
       return json({ ...(await writeSession(env, session)), matchStatus: "matchedPending", match });
+    }
+
+    const alreadyWaiting = session.waitingPlayers.some((player) => isCurrentRoundPlayer(session, player) && player.id === playerId);
+    if (alreadyWaiting) {
+      return json({ ...session, matchStatus: "waiting" });
     }
 
     session.waitingPlayers = [
@@ -445,7 +458,11 @@ const handlePost = async ({ request, env }) => {
       return json({ ...session, matchStatus: "missing" });
     }
 
-    await writeMatchHeartbeat(env, match, playerId, now);
+    if (payload?.heartbeat !== false) {
+      await writeMatchHeartbeat(env, match, playerId, now);
+    } else {
+      touchMatchPlayer(match, playerId, now);
+    }
     await finishMatchIfOpponentTimedOut(env, session, match, playerId, now);
     // Do not persist ordinary polling by rewriting the whole session: a stale getMatch
     // write can overwrite a just-submitted skill in KV and leave the other player stuck

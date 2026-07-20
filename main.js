@@ -6,8 +6,9 @@ const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
-const matchingPollMs = 1000;
+const matchingPollMs = 3000;
 const matchSyncPollMs = 1000;
+const matchHeartbeatWriteIntervalMs = 30000;
 const turnHandoffWatchdogMs = 9000;
 const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
 const sessionRequestTimeoutMs = 12000;
@@ -163,6 +164,7 @@ const battleState = {
   matchSyncTimerId: null,
   turnHandoffWatchdogTimerId: null,
   syncInFlight: false,
+  lastMatchHeartbeatAt: 0,
   matchingTimerId: null,
   rouletteRunId: 0,
   eliminatedTournamentId: Number(localStorage.getItem("schoolRpgEliminatedTournamentId") || "-1"),
@@ -1019,7 +1021,17 @@ const syncMatch = async () => {
   }
   battleState.syncInFlight = true;
   try {
-    const session = await postSessionAction({ action: "getMatch", playerId: battleState.playerId, matchId: battleState.match.id });
+    const now = Date.now();
+    const shouldWriteHeartbeat = now - battleState.lastMatchHeartbeatAt >= matchHeartbeatWriteIntervalMs;
+    const session = await postSessionAction({
+      action: "getMatch",
+      playerId: battleState.playerId,
+      matchId: battleState.match.id,
+      heartbeat: shouldWriteHeartbeat,
+    });
+    if (shouldWriteHeartbeat) {
+      battleState.lastMatchHeartbeatAt = now;
+    }
     applyRemoteSession(session);
     if (session.match) {
       applyRemoteMatch(session.match);
@@ -1183,6 +1195,7 @@ const beginMatchedBattle = async (match) => {
   }
 
   hydrateRemoteMatch(match);
+  battleState.lastMatchHeartbeatAt = 0;
   if (battleState.matchingTimerId) {
     window.clearInterval(battleState.matchingTimerId);
     battleState.matchingTimerId = null;
