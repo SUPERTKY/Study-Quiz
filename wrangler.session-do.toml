@@ -1,0 +1,11 @@
+name = "school-rpg-session-do"
+main = "workers/session-do.js"
+compatibility_date = "2026-07-20"
+
+[[durable_objects.bindings]]
+name = "GAME_SESSION_DO"
+class_name = "SessionDurableObject"
+
+[exports.SessionDurableObject]
+type = "durable-object"
+storage = "sqlite"

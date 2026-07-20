@@ -6,6 +6,11 @@ const waitingPlayerTimeoutMs = 90000;
 const matchPlayerTimeoutMs = 20 * 60 * 1000;
 const matchHeartbeatTtlSeconds = 60 * 60;
 const matchHeartbeatKeyPrefix = "match:";
+const durableObjectBindingName = "GAME_SESSION_DO";
+const durableObjectStorageBindingName = "GAME_SESSION_DURABLE_STORAGE";
+const durableObjectName = "school-rpg-session";
+const durableObjectConsistencyMessage =
+  "Session state is handled by Cloudflare Durable Objects, so match updates are serialized in one strongly consistent coordinator.";
 const kvRealtimeConsistencyWarning =
   "Cloudflare KV is eventually consistent, so rapid match synchronization can be delayed or reordered across clients. Use Durable Objects for reliable real-time battles.";
 
@@ -33,6 +38,7 @@ const json = (body, init = {}) =>
   });
 
 const kvBindingNames = ["GAME_SESSION_KV", "GAME_SESSION"];
+const sessionStoreBindingNames = [durableObjectStorageBindingName, ...kvBindingNames];
 
 class SessionStoreError extends Error {
   constructor(code, message = code) {
@@ -44,11 +50,38 @@ class SessionStoreError extends Error {
 
 const isKvStore = (value) => typeof value?.get === "function" && typeof value?.put === "function";
 
-const getConfiguredBindingNames = (env = {}) => kvBindingNames.filter((name) => env[name] !== undefined && env[name] !== null);
+const createDurableObjectStorageAdapter = (storage) => ({
+  get: async (key, type) => {
+    const value = await storage.get(key);
+    if (type === "json" && typeof value === "string") {
+      return JSON.parse(value);
+    }
+    return value ?? null;
+  },
+  put: async (key, value) => storage.put(key, value),
+  delete: async (key) => storage.delete(key),
+  list: async ({ prefix = "", cursor, limit = 100 } = {}) => {
+    const startAfter = cursor ? decodeURIComponent(cursor) : undefined;
+    const entries = await storage.list({ prefix, startAfter, limit });
+    const keys = Array.from(entries.keys()).map((name) => ({ name }));
+    const lastKey = keys.at(-1)?.name;
+    return {
+      keys,
+      cursor: keys.length >= limit && lastKey ? encodeURIComponent(lastKey) : undefined,
+      list_complete: keys.length < limit,
+    };
+  },
+});
+
+const getConfiguredBindingNames = (env = {}) => sessionStoreBindingNames.filter((name) => env[name] !== undefined && env[name] !== null);
 
 const getSessionStores = (env = {}) => {
+  if (isKvStore(env[durableObjectStorageBindingName])) {
+    return [{ name: durableObjectStorageBindingName, store: createDurableObjectStorageAdapter(env[durableObjectStorageBindingName]) }];
+  }
+
   const configuredBindingNames = getConfiguredBindingNames(env);
-  const stores = configuredBindingNames.filter((name) => isKvStore(env[name])).map((name) => ({ name, store: env[name] }));
+  const stores = configuredBindingNames.filter((name) => kvBindingNames.includes(name) && isKvStore(env[name])).map((name) => ({ name, store: env[name] }));
   if (stores.length > 0) {
     return stores;
   }
@@ -127,13 +160,13 @@ const writeSession = async (env, session, { requireStoreWrite = false } = {}) =>
       }
     }
     if (requireStoreWrite) {
-      throw new SessionStoreError("GAME_SESSION_KV_WRITE_FAILED", lastError?.message);
+      throw new SessionStoreError(stores[0]?.name === durableObjectStorageBindingName ? "GAME_SESSION_DO_WRITE_FAILED" : "GAME_SESSION_KV_WRITE_FAILED", lastError?.message);
     }
     // Fall back to isolate memory instead of surfacing a 500 to clients during a match.
     memorySession = nextSession;
   } else {
     if (requireStoreWrite) {
-      throw new SessionStoreError("GAME_SESSION_KV_NOT_CONFIGURED");
+      throw new SessionStoreError("GAME_SESSION_STORE_NOT_CONFIGURED");
     }
     memorySession = nextSession;
   }
@@ -330,7 +363,24 @@ const requireAdmin = (payload, env = {}) => {
   return { ok: true };
 };
 
-export async function onRequestGet({ env }) {
+const getDurableObjectStub = (env = {}) => {
+  const namespace = env[durableObjectBindingName];
+  if (!namespace || typeof namespace.idFromName !== "function" || typeof namespace.get !== "function") {
+    return null;
+  }
+  return namespace.get(namespace.idFromName(durableObjectName));
+};
+
+const forwardToDurableObject = async (request, env = {}) => {
+  const stub = getDurableObjectStub(env);
+  return stub ? stub.fetch(request) : null;
+};
+
+export async function onRequestGet({ request, env }) {
+  const durableObjectResponse = await forwardToDurableObject(request, env);
+  if (durableObjectResponse) {
+    return durableObjectResponse;
+  }
   return json(await readSession(env));
 }
 
@@ -603,7 +653,13 @@ const getPublicErrorCode = (error) => {
 };
 
 const getSessionStoreDiagnostic = async (env = {}) => {
-  const bindings = Object.fromEntries(
+  const durableObjectConfigured = env[durableObjectStorageBindingName] !== undefined && env[durableObjectStorageBindingName] !== null;
+  const bindings = {
+    [durableObjectStorageBindingName]: {
+      configured: durableObjectConfigured,
+      isDurableObjectStorage: isKvStore(env[durableObjectStorageBindingName]),
+    },
+    ...Object.fromEntries(
     kvBindingNames.map((name) => [
       name,
       {
@@ -611,7 +667,8 @@ const getSessionStoreDiagnostic = async (env = {}) => {
         isKvBinding: isKvStore(env[name]),
       },
     ]),
-  );
+  ),
+  };
 
   let stores;
   try {
@@ -621,13 +678,13 @@ const getSessionStoreDiagnostic = async (env = {}) => {
       ok: false,
       error: getPublicErrorCode(error),
       bindings,
-      consistencyWarning: kvRealtimeConsistencyWarning,
+      consistencyWarning: durableObjectConfigured ? durableObjectConsistencyMessage : kvRealtimeConsistencyWarning,
     };
   }
   if (stores.length === 0) {
     return {
       ok: false,
-      error: "GAME_SESSION_KV_NOT_CONFIGURED",
+      error: "GAME_SESSION_STORE_NOT_CONFIGURED",
       bindings,
       consistencyWarning: kvRealtimeConsistencyWarning,
     };
@@ -642,7 +699,7 @@ const getSessionStoreDiagnostic = async (env = {}) => {
       await store.delete?.(diagnosticKey);
       bindings[name].readWriteOk = savedValue === "ok";
       if (bindings[name].readWriteOk) {
-        return { ok: true, activeBinding: name, bindings, consistencyWarning: kvRealtimeConsistencyWarning };
+        return { ok: true, activeBinding: name, bindings, consistencyWarning: name === durableObjectStorageBindingName ? durableObjectConsistencyMessage : kvRealtimeConsistencyWarning };
       }
       bindings[name].readWriteError = "READ_AFTER_WRITE_MISMATCH";
     } catch (error) {
@@ -654,7 +711,7 @@ const getSessionStoreDiagnostic = async (env = {}) => {
   }
   return {
     ok: false,
-    error: "GAME_SESSION_KV_WRITE_FAILED",
+    error: stores[0]?.name === durableObjectStorageBindingName ? "GAME_SESSION_DO_WRITE_FAILED" : "GAME_SESSION_KV_WRITE_FAILED",
     message: lastError?.message,
     bindings,
     consistencyWarning: kvRealtimeConsistencyWarning,
@@ -663,8 +720,38 @@ const getSessionStoreDiagnostic = async (env = {}) => {
 
 export async function onRequestPost(context) {
   try {
+    const durableObjectResponse = await forwardToDurableObject(context.request, context.env);
+    if (durableObjectResponse) {
+      return durableObjectResponse;
+    }
     return await handlePost(context);
   } catch (error) {
     return json({ ...(await readSession(context?.env)), ok: false, error: getPublicErrorCode(error) });
+  }
+}
+
+
+export class SessionDurableObject {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const env = {
+      ...this.env,
+      [durableObjectStorageBindingName]: this.state.storage,
+    };
+    try {
+      if (request.method === "GET") {
+        return json(await readSession(env));
+      }
+      if (request.method === "POST") {
+        return await handlePost({ request, env });
+      }
+      return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, { status: 405 });
+    } catch (error) {
+      return json({ ...(await readSession(env)), ok: false, error: getPublicErrorCode(error) });
+    }
   }
 }

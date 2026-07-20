@@ -414,6 +414,9 @@ const loadRemoteSession = async () => {
 
 
 const sessionErrorMessages = {
+  GAME_SESSION_STORE_NOT_CONFIGURED: "GAME_SESSION_DO または GAME_SESSION_KV が未設定です。Durable Object binding（推奨）または KV namespace binding を追加してください。",
+  GAME_SESSION_DO_WRITE_FAILED: "GAME_SESSION_DO への書き込みが失敗しました。Durable Object Worker と Pages の binding、再デプロイ、Cloudflare 側の一時障害を確認してください。",
+  GAME_SESSION_DURABLE_STORAGE_IS_NOT_KV_BINDING: "Durable Object 内部ストレージの初期化に失敗しました。Durable Object Worker の設定を確認してください。",
   GAME_SESSION_KV_NOT_CONFIGURED: "GAME_SESSION_KV が未設定です。Cloudflare Pages の KV namespace bindings に同名の KV バインディングを追加してください。",
   GAME_SESSION_KV_IS_NOT_KV_BINDING: "GAME_SESSION_KV が通常の環境変数として設定されています。Environment variables ではなく KV namespace bindings に設定してください。",
   GAME_SESSION_IS_NOT_KV_BINDING: "GAME_SESSION が通常の環境変数として設定されています。Environment variables ではなく KV namespace bindings に設定してください。",
