@@ -39,7 +39,8 @@
 3. **Settings** → **Bindings** → **Add** → **Durable Object** を開きます。
 4. Durable Object binding を次のように設定します。
    - **変数名**: `GAME_SESSION_DO`
-   - **Durable Object namespace**: `school-rpg-session-do` の `SessionDurableObject`
+   - **Durable Object namespace**: `school-rpg-session-do` の `MyDurableObject`
+     - 既に `SessionDurableObject` で作成済みの場合も動くように、Worker は両方のクラス名を公開しています。
 5. **Settings** → **Environment variables** で次の値を設定します。
    - `PASSWORD`: 参加者が学習クイズ画面へ入るためのパスワード
    - `ADMIN_PASSWORD`: 管理者画面と実施状態の更新に使うパスワード
@@ -62,7 +63,7 @@ KV を使う場合は **Settings** → **Functions** → **KV namespace bindings
 
 ### 補足
 
-- Durable Object Worker は `workers/session-do.js` から `SessionDurableObject` を公開します。
+- Durable Object Worker は `workers/session-do.js` から `MyDurableObject` と互換用の `SessionDurableObject` を公開します。
 - Durable Object Worker の設定例は `wrangler.session-do.toml` にあります。
 - 参加受付、試合状態、生存確認は Durable Object 内部ストレージに保存されます。
 - KV フォールバック時のみ、学習中の生存確認は `match:<試合ID>:seen:<参加者ID>` という KV エントリーに保存されます。このエントリーは1時間後に自動削除されます。

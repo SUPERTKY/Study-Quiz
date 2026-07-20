@@ -4,8 +4,8 @@ compatibility_date = "2026-07-20"
 
 [[durable_objects.bindings]]
 name = "GAME_SESSION_DO"
-class_name = "SessionDurableObject"
+class_name = "MyDurableObject"
 
-[exports.SessionDurableObject]
-type = "durable-object"
-storage = "sqlite"
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MyDurableObject"]
