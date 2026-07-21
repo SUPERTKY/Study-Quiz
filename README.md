@@ -35,16 +35,15 @@
    npx wrangler deploy -c wrangler.session-do.toml
    ```
 
-2. Cloudflare ダッシュボードで、この Pages プロジェクトを開きます。
-3. **Settings** → **Bindings** → **Add** → **Durable Object** を開きます。
-4. Durable Object binding を次のように設定します。
+2. Pages には `wrangler.toml` の `GAME_SESSION_DO` binding を反映してデプロイします。ダッシュボードで手動設定する場合も、次と同じ内容にしてください。
    - **変数名**: `GAME_SESSION_DO`
-   - **Durable Object namespace**: `school-rpg-session-do` の `MyDurableObject`
-     - 既に `SessionDurableObject` で作成済みの場合も動くように、Worker は両方のクラス名を公開しています。
-5. **Settings** → **Environment variables** で次の値を設定します。
+   - **Worker / script**: `school-rpg-session-do`
+   - **Durable Object class / entrypoint**: `MyDurableObject`
+   - `hello-world-do-template` などのテンプレート Worker を選ぶと、今回のように `Handler does not export a fetch() function.` になります。これは Durable Object のデータが壊れたのではなく、Pages が「このアプリ用の fetch() を持つ Durable Object クラス」ではないものへ接続している状態です。
+3. **Settings** → **Environment variables** で次の値を設定します。
    - `PASSWORD`: 参加者が学習クイズ画面へ入るためのパスワード
    - `ADMIN_PASSWORD`: 管理者画面と実施状態の更新に使うパスワード
-6. Pages プロジェクトをデプロイし直します。
+4. Pages プロジェクトをデプロイし直します。
 
 ### KV をフォールバックとして使う場合
 
@@ -63,8 +62,8 @@ KV を使う場合は **Settings** → **Functions** → **KV namespace bindings
 
 ### 補足
 
-- Durable Object Worker は `workers/session-do.js` から `MyDurableObject` と互換用の `SessionDurableObject` を公開します。
-- Durable Object Worker の設定例は `wrangler.session-do.toml` にあります。
+- Durable Object Worker は `workers/session-do.js` から `MyDurableObject` と互換用の `SessionDurableObject` を公開します。Pages の binding は基本的に `MyDurableObject` を指定してください。
+- Durable Object Worker の設定例は `wrangler.session-do.toml` にあります。Pages 側の binding 例は `wrangler.toml` にあります。
 - 参加受付、試合状態、生存確認は Durable Object 内部ストレージに保存されます。
 - KV フォールバック時のみ、学習中の生存確認は `match:<試合ID>:seen:<参加者ID>` という KV エントリーに保存されます。このエントリーは1時間後に自動削除されます。
 - すでに増えてしまった古い KV heartbeat は、必要なときだけ `/api/session` に `{"action":"cleanupMatchHeartbeats","adminPassword":"管理者パスワード","limit":100}` を POST して少しずつ削除してください。返却された `cleanupComplete` が `false` の場合は、`cleanupCursor` を次のリクエストに含めて繰り返します。

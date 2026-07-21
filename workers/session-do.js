@@ -2,11 +2,18 @@ import { SessionDurableObject } from "../functions/api/session.js";
 
 export { SessionDurableObject };
 
-// Cloudflare's Durable Object starter/template exports a class named
-// `MyDurableObject`. Some existing Pages bindings can still point at that
-// entrypoint, so keep this compatibility alias to prevent runtime exceptions
-// after connecting the namespace from the dashboard.
-export class MyDurableObject extends SessionDurableObject {}
+// Cloudflare Pages calls the Durable Object class configured on the Pages
+// binding. Keep `MyDurableObject` as the primary class because many dashboard
+// bindings created from the starter template use that entrypoint name.
+export class MyDurableObject {
+  constructor(state, env) {
+    this.sessionDurableObject = new SessionDurableObject(state, env);
+  }
+
+  async fetch(request) {
+    return this.sessionDurableObject.fetch(request);
+  }
+}
 
 export default {
   async fetch(request, env) {
