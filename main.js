@@ -6,8 +6,8 @@ const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
-const matchingPollMs = 3000;
-const matchSyncPollMs = 1000;
+const matchingPollMs = 5000;
+const matchSyncPollMs = 3000;
 const matchHeartbeatWriteIntervalMs = 30000;
 const turnHandoffWatchdogMs = 9000;
 const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
@@ -1480,7 +1480,7 @@ window.addEventListener("load", async () => {
   await loadRemoteSession();
   resetBattle();
   loadQuestions();
-  window.setInterval(loadRemoteSession, 5000);
+  window.setInterval(loadRemoteSession, 15000);
 
   authState.startupUnlocked = await showPasswordGate("startup");
   if (!authState.startupUnlocked) {
