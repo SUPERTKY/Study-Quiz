@@ -8,6 +8,7 @@ const matchHeartbeatTtlSeconds = 60 * 60;
 const matchHeartbeatKeyPrefix = "match:";
 const durableObjectBindingName = "GAME_SESSION_DO";
 const durableObjectStorageBindingName = "GAME_SESSION_DURABLE_STORAGE";
+const durableObjectForwardErrorCode = "GAME_SESSION_DO_FORWARD_FAILED";
 const durableObjectName = "school-rpg-session";
 const durableObjectConsistencyMessage =
   "Session state is handled by Cloudflare Durable Objects, so match updates are serialized in one strongly consistent coordinator.";
@@ -390,7 +391,7 @@ export async function onRequestGet({ request, env }) {
   return json(await readSession(env));
 }
 
-const handlePost = async ({ request, env }) => {
+const handlePost = async ({ request, env, durableObjectForwardError }) => {
   let payload;
   try {
     payload = await request.json();
@@ -590,7 +591,7 @@ const handlePost = async ({ request, env }) => {
   }
 
   if (action === "diagnoseSessionStore") {
-    return json({ ...session, ...(await getSessionStoreDiagnostic(env)) });
+    return json({ ...session, ...(await getSessionStoreDiagnostic(env, { durableObjectForwardError })) });
   }
 
   if (action === "cleanupMatchHeartbeats") {
@@ -658,11 +659,30 @@ const getPublicErrorCode = (error) => {
   return "SESSION_TEMPORARILY_UNAVAILABLE";
 };
 
-const getSessionStoreDiagnostic = async (env = {}) => {
-  const durableObjectConfigured = env[durableObjectStorageBindingName] !== undefined && env[durableObjectStorageBindingName] !== null;
+const serializeDiagnosticError = (error) =>
+  error
+    ? {
+        message: error?.message ?? String(error),
+        name: error?.name,
+        stack: error?.stack,
+      }
+    : undefined;
+
+const getSessionStoreDiagnostic = async (env = {}, { durableObjectForwardError } = {}) => {
+  const durableObjectNamespaceConfigured = env[durableObjectBindingName] !== undefined && env[durableObjectBindingName] !== null;
+  const durableObjectStorageConfigured = env[durableObjectStorageBindingName] !== undefined && env[durableObjectStorageBindingName] !== null;
+  const durableObjectForwardErrorDetail = serializeDiagnosticError(durableObjectForwardError);
   const bindings = {
+    [durableObjectBindingName]: {
+      configured: durableObjectNamespaceConfigured,
+      isDurableObjectNamespace:
+        typeof env[durableObjectBindingName]?.idFromName === "function" &&
+        typeof env[durableObjectBindingName]?.get === "function",
+      forwardedToDurableObject: !durableObjectForwardErrorDetail && durableObjectStorageConfigured,
+      forwardError: durableObjectForwardErrorDetail,
+    },
     [durableObjectStorageBindingName]: {
-      configured: durableObjectConfigured,
+      configured: durableObjectStorageConfigured,
       isDurableObjectStorage: isKvStore(env[durableObjectStorageBindingName]),
     },
     ...Object.fromEntries(
@@ -684,13 +704,13 @@ const getSessionStoreDiagnostic = async (env = {}) => {
       ok: false,
       error: getPublicErrorCode(error),
       bindings,
-      consistencyWarning: durableObjectConfigured ? durableObjectConsistencyMessage : kvRealtimeConsistencyWarning,
+      consistencyWarning: durableObjectStorageConfigured ? durableObjectConsistencyMessage : kvRealtimeConsistencyWarning,
     };
   }
   if (stores.length === 0) {
     return {
       ok: false,
-      error: "GAME_SESSION_STORE_NOT_CONFIGURED",
+      error: durableObjectForwardErrorDetail ? durableObjectForwardErrorCode : "GAME_SESSION_STORE_NOT_CONFIGURED",
       bindings,
       consistencyWarning: kvRealtimeConsistencyWarning,
     };
@@ -730,7 +750,8 @@ export async function onRequestPost(context) {
     if (durableObjectResponse) {
       return durableObjectResponse;
     }
-  } catch {
+  } catch (error) {
+    context.durableObjectForwardError = error;
     // Keep POST actions usable when a configured Durable Object namespace still
     // points at an old/template Worker that does not implement fetch(). The
     // original request body is preserved by forwarding a clone above, so the

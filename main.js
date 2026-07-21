@@ -416,6 +416,7 @@ const loadRemoteSession = async () => {
 const sessionErrorMessages = {
   GAME_SESSION_STORE_NOT_CONFIGURED: "GAME_SESSION_DO または GAME_SESSION_KV が未設定です。Durable Object binding（推奨）または KV namespace binding を追加してください。",
   GAME_SESSION_DO_WRITE_FAILED: "GAME_SESSION_DO への書き込みが失敗しました。Durable Object Worker と Pages の binding、再デプロイ、Cloudflare 側の一時障害を確認してください。",
+  GAME_SESSION_DO_FORWARD_FAILED: "Pages から Durable Object への接続でエラーが出ています。管理者画面のデバッグ詳細に表示された forwardError を確認してください。",
   GAME_SESSION_DURABLE_STORAGE_IS_NOT_KV_BINDING: "Durable Object 内部ストレージの初期化に失敗しました。Durable Object Worker の設定を確認してください。",
   GAME_SESSION_KV_NOT_CONFIGURED: "GAME_SESSION_KV が未設定です。Cloudflare Pages の KV namespace bindings に同名の KV バインディングを追加してください。",
   GAME_SESSION_KV_IS_NOT_KV_BINDING: "GAME_SESSION_KV が通常の環境変数として設定されています。Environment variables ではなく KV namespace bindings に設定してください。",
@@ -1398,7 +1399,7 @@ adminRoundButton.addEventListener("click", async () => {
 adminDebugButton?.addEventListener("click", async () => {
   battleState.adminBusy = true;
   updateAdminButtonStates();
-  adminStatus.textContent = "KV の接続状態を確認しています...";
+  adminStatus.textContent = "Durable Objects / KV の接続状態を確認しています...";
   try {
     const result = await postSessionAction({
       action: "diagnoseSessionStore",
@@ -1406,11 +1407,11 @@ adminDebugButton?.addEventListener("click", async () => {
     });
     showAdminDebugResult(result);
     adminStatus.textContent = result.activeBinding
-      ? `KV デバッグ完了: ${result.activeBinding} で読み書きできました。`
-      : "KV デバッグ完了: 詳細を下の表示で確認してください。";
+      ? `接続デバッグ完了: ${result.activeBinding} で読み書きできました。`
+      : getSessionErrorMessage({ result }, "接続デバッグ完了: 詳細を下の表示で確認してください。");
   } catch (error) {
     showAdminDebugResult(error.result ?? { ok: false, message: error.message, status: error.status });
-    adminStatus.textContent = getSessionErrorMessage(error, "KV デバッグに失敗しました。詳細を下の表示で確認してください。");
+    adminStatus.textContent = getSessionErrorMessage(error, "接続デバッグに失敗しました。詳細を下の表示で確認してください。");
   } finally {
     battleState.adminBusy = false;
     updateAdminButtonStates();
