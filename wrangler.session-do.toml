@@ -9,3 +9,7 @@ class_name = "MyDurableObject"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MyDurableObject"]
+
+[observability.logs]
+enabled = true
+invocation_logs = true

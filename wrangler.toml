@@ -6,3 +6,7 @@ compatibility_date = "2026-07-20"
 name = "GAME_SESSION_DO"
 class_name = "MyDurableObject"
 script_name = "school-rpg-session-do"
+
+[observability.logs]
+enabled = true
+invocation_logs = true
