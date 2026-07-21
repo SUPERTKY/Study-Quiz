@@ -1,4 +1,4 @@
-name = "school-rpg-session-do"
+name = "study-quiz-session-do"
 main = "workers/session-do.js"
 compatibility_date = "2026-07-20"
 

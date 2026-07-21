@@ -7,7 +7,8 @@ const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
 const matchingPollMs = 5000;
-const matchSyncPollMs = 3000;
+const matchSyncPollMs = 10000;
+const matchSyncActivePollMs = 5000;
 const matchHeartbeatWriteIntervalMs = 30000;
 const turnHandoffWatchdogMs = 9000;
 const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
@@ -399,7 +400,10 @@ const applyRemoteSession = (session) => {
   updateSessionUi();
 };
 
-const loadRemoteSession = async () => {
+const loadRemoteSession = async ({ force = false } = {}) => {
+  if (!force && battleState.phase !== "idle") {
+    return;
+  }
   try {
     applyRemoteSession(await fetchSessionJson(sessionEndpoint, { cache: "no-store" }));
   } catch (error) {
@@ -940,7 +944,7 @@ const armTurnHandoffWatchdog = (phase, version = battleState.lastMatchVersion) =
     if (battleState.phase !== phase || battleState.lastMatchVersion !== version || !battleState.match?.id) {
       return;
     }
-    syncMatch();
+    syncMatch({ force: true });
     armTurnHandoffWatchdog(phase, version);
   }, turnHandoffWatchdogMs);
 };
@@ -1016,8 +1020,15 @@ const applyRemoteMatch = (match) => {
   }
 };
 
-const syncMatch = async () => {
-  if (!battleState.match?.id || battleState.phase === "finished" || battleState.syncInFlight) {
+const shouldPollMatchSync = () =>
+  battleState.match?.id &&
+  document.visibilityState === "visible" &&
+  ["opponent", "roulette", "resolving"].includes(battleState.phase);
+
+const getNextMatchSyncDelay = () => (battleState.phase === "opponent" ? matchSyncActivePollMs : matchSyncPollMs);
+
+const syncMatch = async ({ force = false } = {}) => {
+  if (!battleState.match?.id || battleState.phase === "finished" || battleState.syncInFlight || (!force && !shouldPollMatchSync())) {
     return;
   }
   battleState.syncInFlight = true;
@@ -1046,15 +1057,26 @@ const syncMatch = async () => {
   }
 };
 
+const scheduleNextMatchSync = () => {
+  if (!battleState.match?.id || battleState.phase === "finished") {
+    return;
+  }
+  battleState.matchSyncTimerId = window.setTimeout(async () => {
+    battleState.matchSyncTimerId = null;
+    await syncMatch();
+    scheduleNextMatchSync();
+  }, getNextMatchSyncDelay());
+};
+
 const startMatchSync = () => {
   stopMatchSync();
-  syncMatch();
-  battleState.matchSyncTimerId = window.setInterval(syncMatch, matchSyncPollMs);
+  syncMatch({ force: true });
+  scheduleNextMatchSync();
 };
 
 const stopMatchSync = () => {
   if (battleState.matchSyncTimerId) {
-    window.clearInterval(battleState.matchSyncTimerId);
+    window.clearTimeout(battleState.matchSyncTimerId);
     battleState.matchSyncTimerId = null;
   }
 };
@@ -1137,7 +1159,7 @@ const applySkillResult = async (skillKey, effectivePoint, correct, wrong) => {
     }
     setBattleMessage("操作の送信に失敗しました。もう一度同期します。");
     armTurnHandoffWatchdog("resolving");
-    await syncMatch();
+    await syncMatch({ force: true });
   }
 };
 
@@ -1386,7 +1408,7 @@ adminRoundButton.addEventListener("click", async () => {
   try {
     await postSessionAction({ action: "advanceRound", adminPassword: authState.adminPassword });
     adminRoundButton.textContent = nextRoundLabel;
-    await loadRemoteSession();
+    await loadRemoteSession({ force: true });
   } catch (error) {
     adminStatus.textContent = "回進行に失敗しました。";
   } finally {
@@ -1426,7 +1448,7 @@ adminResetTournamentButton.addEventListener("click", async () => {
     localStorage.removeItem("schoolRpgEliminatedTournamentId");
     battleState.eliminatedTournamentId = -1;
     adminRoundButton.textContent = "最初の参加受付締め切り";
-    await loadRemoteSession();
+    await loadRemoteSession({ force: true });
   } catch (error) {
     adminStatus.textContent = "実施番号のリセットに失敗しました。";
   } finally {
@@ -1467,17 +1489,17 @@ battleActions.addEventListener("click", (event) => {
 window.addEventListener("beforeunload", notifyPlayerDisconnected);
 window.addEventListener("online", () => {
   if (["matching", "roulette", "player", "opponent", "question", "resolving"].includes(battleState.phase)) {
-    syncMatch();
+    syncMatch({ force: true });
   }
 });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && ["matching", "roulette", "player", "opponent", "question", "resolving"].includes(battleState.phase)) {
-    syncMatch();
+    syncMatch({ force: true });
   }
 });
 
 window.addEventListener("load", async () => {
-  await loadRemoteSession();
+  await loadRemoteSession({ force: true });
   resetBattle();
   loadQuestions();
   window.setInterval(loadRemoteSession, 15000);

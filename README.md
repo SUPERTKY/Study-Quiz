@@ -37,7 +37,7 @@
 
 2. Pages には `wrangler.toml` の `GAME_SESSION_DO` binding を反映してデプロイします。ダッシュボードで手動設定する場合も、次と同じ内容にしてください。
    - **変数名**: `GAME_SESSION_DO`
-   - **Worker / script**: `school-rpg-session-do`
+   - **Worker / script**: `study-quiz-session-do`
    - **Durable Object class / entrypoint**: `MyDurableObject`
    - `hello-world-do-template` などのテンプレート Worker を選ぶと、今回のように `Handler does not export a fetch() function.` になります。これは Durable Object のデータが壊れたのではなく、Pages が「このアプリ用の fetch() を持つ Durable Object クラス」ではないものへ接続している状態です。
 3. **Settings** → **Environment variables** で次の値を設定します。
