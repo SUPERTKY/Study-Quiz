@@ -35,10 +35,11 @@
    npx wrangler deploy -c wrangler.session-do.toml
    ```
 
-2. Pages には `wrangler.toml` の `GAME_SESSION_DO` binding を反映してデプロイします。ダッシュボードで手動設定する場合も、次と同じ内容にしてください。
+2. Pages の Git 連携デプロイは Durable Object Worker を自動作成しないため、`wrangler.toml` には `GAME_SESSION_DO` binding を書きません。先に Worker をデプロイしてから、Cloudflare ダッシュボードで Pages の binding を手動追加してください。
    - **変数名**: `GAME_SESSION_DO`
    - **Worker / script**: `study-quiz-session-do`
    - **Durable Object class / entrypoint**: `MyDurableObject`
+   - Worker を未デプロイのまま `wrangler.toml` に `script_name` を書くと、`Script study-quiz-session-do not found` で Pages の Functions 公開が失敗します。
    - `hello-world-do-template` などのテンプレート Worker を選ぶと、今回のように `Handler does not export a fetch() function.` になります。これは Durable Object のデータが壊れたのではなく、Pages が「このアプリ用の fetch() を持つ Durable Object クラス」ではないものへ接続している状態です。
 3. **Settings** → **Environment variables** で次の値を設定します。
    - `PASSWORD`: 参加者が学習クイズ画面へ入るためのパスワード
