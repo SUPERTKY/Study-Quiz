@@ -29,22 +29,15 @@
 
 ### Cloudflare Pages で必要な設定
 
-1. `wrangler.session-do.toml` を使って Durable Object Worker をデプロイします。
+通常のWebサイトとして動かすだけなら、`school-rpg-session-do` というWorkerは必須ではありません。`wrangler.toml` には `GAME_SESSION_DO` bindingを書かず、Cloudflare Pages本体だけをデプロイします。
 
-   ```bash
-   npx wrangler deploy -c wrangler.session-do.toml
-   ```
-
-2. Pages の Git 連携デプロイは Durable Object Worker を自動作成しないため、`wrangler.toml` には `GAME_SESSION_DO` binding を書きません。先に Worker をデプロイしてから、Cloudflare ダッシュボードで Pages の binding を手動追加してください。
-   - **変数名**: `GAME_SESSION_DO`
-   - **Worker / script**: `study-quiz-session-do`
-   - **Durable Object class / entrypoint**: `MyDurableObject`
-   - Worker を未デプロイのまま `wrangler.toml` に `script_name` を書くと、`Script study-quiz-session-do not found` で Pages の Functions 公開が失敗します。
-   - `hello-world-do-template` などのテンプレート Worker を選ぶと、今回のように `Handler does not export a fetch() function.` になります。これは Durable Object のデータが壊れたのではなく、Pages が「このアプリ用の fetch() を持つ Durable Object クラス」ではないものへ接続している状態です。
-3. **Settings** → **Environment variables** で次の値を設定します。
+1. Cloudflare Pages のWeb画面で、このリポジトリをGit連携デプロイします。
+2. **Settings** → **Environment variables** で次の値を設定します。
    - `PASSWORD`: 参加者が学習クイズ画面へ入るためのパスワード
    - `ADMIN_PASSWORD`: 管理者画面と実施状態の更新に使うパスワード
-4. Pages プロジェクトをデプロイし直します。
+3. Pages プロジェクトをデプロイし直します。
+
+Durable Objectsを本当に使う場合だけ、別途 `school-rpg-session-do` Worker と `GAME_SESSION_DO` binding が必要です。`wrangler.toml` に `script_name = "school-rpg-session-do"` を書くと、Cloudflare PagesはそのWorkerが実在する前提でFunctionsを公開しようとします。Workerが存在しない場合は `Script school-rpg-session-do not found` でデプロイが失敗するため、このリポジトリのPages用 `wrangler.toml` にはDurable Object bindingを書かない構成にしています。
 
 ### KV をフォールバックとして使う場合
 
