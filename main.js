@@ -6,10 +6,12 @@ const titleFadeDurationMs = 1000;
 const titleMoveDelayMs = 1000;
 const titleMoveDurationMs = 800;
 const maxHp = 120;
-const matchingPollMs = 5000;
-const matchSyncPollMs = 10000;
-const matchSyncActivePollMs = 5000;
+const matchingPollMs = 7000;
+const matchSyncPollMs = 12000;
+const matchSyncActivePollMs = 7000;
 const matchHeartbeatWriteIntervalMs = 30000;
+const sessionIdlePollMs = 30000;
+const forcedMatchSyncCooldownMs = 3000;
 const turnHandoffWatchdogMs = 9000;
 const opponentAbsenceWinMessage = "相手の接続が切れたため、勝利しました。";
 const sessionRequestTimeoutMs = 12000;
@@ -165,6 +167,7 @@ const battleState = {
   matchSyncTimerId: null,
   turnHandoffWatchdogTimerId: null,
   syncInFlight: false,
+  lastForcedMatchSyncAt: 0,
   lastMatchHeartbeatAt: 0,
   matchingTimerId: null,
   rouletteRunId: 0,
@@ -484,7 +487,7 @@ const fetchSessionJson = async (url, options = {}) => {
   }
 };
 
-const postSessionAction = async (payload, { retries = 3 } = {}) => {
+const postSessionAction = async (payload, { retries = 2 } = {}) => {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
@@ -1027,6 +1030,15 @@ const shouldPollMatchSync = () =>
 
 const getNextMatchSyncDelay = () => (battleState.phase === "opponent" ? matchSyncActivePollMs : matchSyncPollMs);
 
+const requestForcedMatchSync = () => {
+  const now = Date.now();
+  if (now - battleState.lastForcedMatchSyncAt < forcedMatchSyncCooldownMs) {
+    return;
+  }
+  battleState.lastForcedMatchSyncAt = now;
+  syncMatch({ force: true });
+};
+
 const syncMatch = async ({ force = false } = {}) => {
   if (!battleState.match?.id || battleState.phase === "finished" || battleState.syncInFlight || (!force && !shouldPollMatchSync())) {
     return;
@@ -1489,12 +1501,12 @@ battleActions.addEventListener("click", (event) => {
 window.addEventListener("beforeunload", notifyPlayerDisconnected);
 window.addEventListener("online", () => {
   if (["matching", "roulette", "player", "opponent", "question", "resolving"].includes(battleState.phase)) {
-    syncMatch({ force: true });
+    requestForcedMatchSync();
   }
 });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && ["matching", "roulette", "player", "opponent", "question", "resolving"].includes(battleState.phase)) {
-    syncMatch({ force: true });
+    requestForcedMatchSync();
   }
 });
 
@@ -1502,7 +1514,7 @@ window.addEventListener("load", async () => {
   await loadRemoteSession({ force: true });
   resetBattle();
   loadQuestions();
-  window.setInterval(loadRemoteSession, 15000);
+  window.setInterval(loadRemoteSession, sessionIdlePollMs);
 
   authState.startupUnlocked = await showPasswordGate("startup");
   if (!authState.startupUnlocked) {
