@@ -145,21 +145,7 @@
 
       <section id="passwordGate" class="password-gate" aria-label="パスワード入力画面">
         <form id="passwordForm" class="password-gate__panel">
-          <section class="site-introduction" aria-labelledby="siteIntroductionTitle">
-            <p class="site-introduction__eyebrow">学校の発表用に生徒が制作したWebアプリ</p>
-            <h1 id="siteIntroductionTitle">スタディクイズ</h1>
-            <p>数学・国語・英語・理科・社会の問題に取り組む、対戦形式の学習クイズです。学校で作品を紹介し、参加者同士で学習を楽しむために制作しました。</p>
-            <h2>対象教科</h2>
-            <p>数学・国語・英語・理科・社会</p>
-            <h2>使い方</h2>
-            <ol>
-              <li>発表の担当者から案内された参加用パスワードを入力します。</li>
-              <li>担当者が教科を選んで開始したら、タイトル画面の参加ボタンを押します。</li>
-              <li>相手との対戦が始まったら、画面の案内に沿って問題に答えます。</li>
-            </ol>
-            <p>この説明はパスワードなしで読めます。クイズへの参加には認証とインターネット接続が必要です。</p>
-          </section>
-          <h2 id="passwordTitle">パスワード認証</h2>
+          <h1 id="passwordTitle">パスワード認証</h1>
           <p id="passwordDescription">学習クイズを開始するにはパスワードを入力してください。</p>
           <label class="password-gate__label" for="passwordInput">パスワード</label>
           <input id="passwordInput" class="password-gate__input" name="password" type="password" autocomplete="current-password" required />
@@ -168,6 +154,21 @@
             <button id="passwordCancelButton" class="password-gate__cancel" type="button" hidden>キャンセル</button>
             <button class="password-gate__submit" type="submit">認証する</button>
           </div>
+          <details class="site-introduction">
+            <summary>このサイトについて</summary>
+            <p class="site-introduction__eyebrow">学校の発表用に生徒が制作したWebアプリ</p>
+            <h2>スタディクイズ</h2>
+            <p>数学・国語・英語・理科・社会の問題に取り組む、対戦形式の学習クイズです。学校で作品を紹介し、参加者同士で学習を楽しむために制作しました。</p>
+            <h3>対象教科</h3>
+            <p>数学・国語・英語・理科・社会</p>
+            <h3>使い方</h3>
+            <ol>
+              <li>発表の担当者から案内された参加用パスワードを入力します。</li>
+              <li>担当者が教科を選んで開始したら、タイトル画面の参加ボタンを押します。</li>
+              <li>相手との対戦が始まったら、画面の案内に沿って問題に答えます。</li>
+            </ol>
+            <p>この説明はパスワードなしで読めます。クイズへの参加には認証とインターネット接続が必要です。</p>
+          </details>
         </form>
       </section>
 

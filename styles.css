@@ -737,7 +737,7 @@ img {
 }
 
 .password-gate__panel {
-  width: min(100%, 600px);
+  width: min(100%, 420px);
   min-width: 0;
   max-height: calc(100vh - 48px);
   max-height: calc(100dvh - 48px);
@@ -748,8 +748,7 @@ img {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
 }
 
-.password-gate__panel h1,
-.password-gate__panel > h2 {
+.password-gate__panel > h1 {
   margin: 0 0 10px;
   font-size: 1.6rem;
 }
@@ -760,11 +759,26 @@ img {
 }
 
 .site-introduction {
-  margin-bottom: 24px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #475569;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #475569;
   user-select: text;
   overflow-wrap: anywhere;
+}
+
+.site-introduction > summary {
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.site-introduction > summary:focus-visible {
+  outline: 2px solid #f7d36a;
+  outline-offset: 4px;
+}
+
+.site-introduction[open] > summary {
+  margin-bottom: 16px;
 }
 
 .site-introduction__eyebrow {
@@ -772,7 +786,8 @@ img {
   font-size: 0.85rem;
 }
 
-.site-introduction h2 {
+.site-introduction h2,
+.site-introduction h3 {
   margin: 18px 0 8px;
   font-size: 1rem;
 }
