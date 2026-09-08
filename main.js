@@ -207,7 +207,7 @@ const setPasswordMode = (mode) => {
 const showPasswordGate = (mode) => {
   setPasswordMode(mode);
   passwordGate.hidden = false;
-  passwordInput.focus();
+  passwordInput.focus({ preventScroll: true });
 
   return new Promise((resolve) => {
     authState.pendingResolve = resolve;
