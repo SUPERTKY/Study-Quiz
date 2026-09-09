@@ -72,6 +72,7 @@ const adminStatus = document.querySelector("#adminStatus");
 const adminHostButton = document.querySelector("#adminHostButton");
 const adminStopButton = document.querySelector("#adminStopButton");
 const adminRoundButton = document.querySelector("#adminRoundButton");
+const adminOpenRegistrationButton = document.querySelector("#adminOpenRegistrationButton");
 const adminResetTournamentButton = document.querySelector("#adminResetTournamentButton");
 const adminDebugButton = document.querySelector("#adminDebugButton");
 const adminDebugOutput = document.querySelector("#adminDebugOutput");
@@ -357,7 +358,12 @@ const updateAdminButtonStates = () => {
     adminStopButton.disabled = battleState.adminBusy || !battleState.hosted;
   }
   if (adminRoundButton) {
-    adminRoundButton.disabled = battleState.adminBusy || !battleState.hosted;
+    adminRoundButton.disabled = battleState.adminBusy || !battleState.hosted || battleState.closingRound;
+    adminRoundButton.setAttribute("aria-pressed", String(battleState.hosted && battleState.closingRound));
+  }
+  if (adminOpenRegistrationButton) {
+    adminOpenRegistrationButton.disabled = battleState.adminBusy || !battleState.hosted || !battleState.closingRound;
+    adminOpenRegistrationButton.setAttribute("aria-pressed", String(battleState.hosted && !battleState.closingRound));
   }
   if (adminDebugButton) {
     adminDebugButton.disabled = battleState.adminBusy;
@@ -367,7 +373,7 @@ const updateAdminButtonStates = () => {
 const updateSessionUi = () => {
   const subject = getSelectedSubject();
   const statusText = battleState.hosted
-    ? `実施中: ${subject.label} / 実施${battleState.tournamentId} 第${battleState.round + 1}受付${battleState.closingRound ? "締め切り中" : ""}`
+    ? `実施中: ${subject.label} / 実施${battleState.tournamentId} / 参加受付: ${battleState.closingRound ? "締め切り" : "募集中"}`
     : "現在は実施していません。管理者画面で教科を選んで開始してください。";
 
   subjectLabel.textContent = `教科: ${subject.label}`;
@@ -377,7 +383,7 @@ const updateSessionUi = () => {
   matchingButton.classList.toggle("is-visible", battleState.hosted && titleImage.classList.contains("is-settled"));
   if (sessionNotice) {
     sessionNotice.hidden = battleState.hosted && !isEliminated && !battleState.closingRound;
-    sessionNotice.textContent = !battleState.hosted ? "現在実施していません。管理者が開始するまで参加できません。" : isEliminated ? "今回は終了したため、次の回まで参加できません。" : "参加受付を締め切りました。次の回の開始を待ってください。";
+    sessionNotice.textContent = !battleState.hosted ? "現在実施していません。管理者が開始するまで参加できません。" : isEliminated ? "今回は終了したため、次の回まで参加できません。" : "参加受付は締め切りです。募集の再開を待ってください。";
     sessionNotice.classList.toggle("is-visible", !sessionNotice.hidden && titleImage.classList.contains("is-settled"));
   }
   if (adminStatus) {
@@ -1270,7 +1276,7 @@ const pollMatching = async () => {
       return;
     }
     if (session.matchStatus === "closed") {
-      forceReturnToTitle("現在実施していません。");
+      forceReturnToTitle(session.hosted ? "参加受付は締め切りです。募集の再開を待ってください。" : "現在実施していません。");
       return;
     }
     if (session.matchStatus === "matchedPending") {
@@ -1305,7 +1311,7 @@ const startBattleScene = async () => {
     return;
   }
   if (battleState.closingRound) {
-    setBattleMessage("参加受付を締め切りました。次の開始を待ってください。");
+    setBattleMessage("参加受付は締め切りです。募集の再開を待ってください。");
     return;
   }
 
@@ -1407,27 +1413,28 @@ adminStopButton.addEventListener("click", async () => {
   }
 });
 
-adminRoundButton.addEventListener("click", async () => {
-  if (!battleState.hosted) {
+const setRegistrationClosed = async (closed) => {
+  if (battleState.adminBusy || !battleState.hosted || battleState.closingRound === closed) {
     updateSessionUi();
     return;
   }
 
   battleState.adminBusy = true;
   updateAdminButtonStates();
-  const nextRoundLabel = battleState.round === 0 ? "第2回開始" : `第${battleState.round + 2}回開始`;
-  adminStatus.textContent = `5秒後に${nextRoundLabel}に進みます...`;
+  adminStatus.textContent = closed ? "参加受付を締め切っています..." : "参加募集を再開しています...";
   try {
-    await postSessionAction({ action: "advanceRound", adminPassword: authState.adminPassword });
-    adminRoundButton.textContent = nextRoundLabel;
-    await loadRemoteSession({ force: true });
+    const session = await postSessionAction({ action: "setRegistrationClosed", closed, adminPassword: authState.adminPassword });
+    applyRemoteSession(session);
   } catch (error) {
-    adminStatus.textContent = "回進行に失敗しました。";
+    adminStatus.textContent = "参加受付の変更に失敗しました。もう一度選択してください。";
   } finally {
     battleState.adminBusy = false;
     updateAdminButtonStates();
   }
-});
+};
+
+adminRoundButton.addEventListener("click", () => setRegistrationClosed(true));
+adminOpenRegistrationButton.addEventListener("click", () => setRegistrationClosed(false));
 
 
 adminDebugButton?.addEventListener("click", async () => {
@@ -1459,7 +1466,6 @@ adminResetTournamentButton.addEventListener("click", async () => {
     await postSessionAction({ action: "resetTournamentNumber", adminPassword: authState.adminPassword });
     localStorage.removeItem("schoolRpgEliminatedTournamentId");
     battleState.eliminatedTournamentId = -1;
-    adminRoundButton.textContent = "最初の参加受付締め切り";
     await loadRemoteSession({ force: true });
   } catch (error) {
     adminStatus.textContent = "実施番号のリセットに失敗しました。";

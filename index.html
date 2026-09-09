@@ -50,7 +50,11 @@
               <div class="admin-screen__actions">
                 <button id="adminHostButton" class="admin-screen__host" type="submit">この教科で開始する</button>
                 <button id="adminStopButton" class="admin-screen__stop" type="button">実施を終了する</button>
-                <button id="adminRoundButton" class="admin-screen__round" type="button">最初の参加受付締め切り</button>
+                <fieldset>
+                  <legend>参加受付</legend>
+                  <button id="adminOpenRegistrationButton" class="admin-screen__round" type="button" aria-pressed="false">募集中</button>
+                  <button id="adminRoundButton" class="admin-screen__round" type="button" aria-pressed="false">締め切り</button>
+                </fieldset>
                 <button id="adminResetTournamentButton" class="admin-screen__reset" type="button">実施番号リセット</button>
                 <button id="adminDebugButton" class="admin-screen__debug" type="button">接続デバッグ</button>
                 <button id="adminBackButton" class="admin-screen__back" type="button">タイトルへ戻る</button>

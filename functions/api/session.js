@@ -435,6 +435,11 @@ const handlePost = async ({ request, env, durableObjectForwardError }) => {
       return json({ ...session, matchStatus: "matchedPending", match: existingMatch });
     }
 
+    // Already paired players can finish their handshake while new entries are closed.
+    if (session.closingRound) {
+      return json({ ...session, matchStatus: "closed" });
+    }
+
     const otherPlayers = session.waitingPlayers.filter((player) => isCurrentRoundPlayer(session, player) && player.id !== playerId);
     if (otherPlayers.length > 0) {
       const opponent = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
@@ -610,23 +615,19 @@ const handlePost = async ({ request, env, durableObjectForwardError }) => {
     return json({ ...(await writeSession(env, session, { requireStoreWrite: true })), heartbeatKeysDeleted });
   }
 
-  if (action === "advanceRound") {
-    const originalTournamentId = session.tournamentId;
-    const originalRound = session.round;
-    session.closingRound = true;
-    await writeSession(env, session, { requireStoreWrite: true });
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    const latestSession = await readSession(env);
-    if (!latestSession.hosted || latestSession.tournamentId !== originalTournamentId || latestSession.round !== originalRound) {
-      return json(latestSession);
+  // Older open tabs may still send advanceRound: treat it as closing admission.
+  if (action === "setRegistrationClosed" || action === "advanceRound") {
+    if (action === "setRegistrationClosed" && typeof payload.closed !== "boolean") {
+      return json({ ok: false, error: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    latestSession.round += 1;
-    latestSession.closingRound = false;
-    latestSession.waitingPlayers = [];
-    latestSession.matches = {};
-    return json(await writeSession(env, latestSession, { requireStoreWrite: true }));
+    if (!session.hosted) {
+      return json({ ok: false, error: "SESSION_NOT_HOSTED" }, { status: 409 });
+    }
+    session.closingRound = action === "advanceRound" || payload.closed;
+    if (session.closingRound) {
+      session.waitingPlayers = [];
+    }
+    return json(await writeSession(env, session, { requireStoreWrite: true }));
   }
 
   const nextHosted = payload?.hosted === true;

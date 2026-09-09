@@ -1078,3 +1078,14 @@ img {
   text-align: left;
   white-space: pre-wrap;
 }
+
+/* Make the selected admission state visible in the two-choice control. */
+.admin-screen__round[aria-pressed="true"] {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  opacity: 1;
+}
+
+.admin-screen__round[aria-pressed="false"]:disabled {
+  opacity: 0.5;
+}
