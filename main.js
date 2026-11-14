@@ -218,7 +218,6 @@ const showPasswordGate = (mode) => {
 
 const waitForRememberedStart = () => {
   rememberedStartButton.hidden = false;
-  rememberedStartButton.focus({ preventScroll: true });
   return new Promise((resolve) => {
     rememberedStartButton.addEventListener("click", () => {
       rememberedStartButton.hidden = true;
