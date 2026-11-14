@@ -239,6 +239,17 @@ const authenticatePassword = async (password, mode) => {
   return result.ok === true;
 };
 
+const hasSavedStartupAccess = async () => {
+  const response = await fetch(authEndpoint, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  if (!response.ok) return false;
+  const result = await response.json();
+  return result.ok === true && result.authenticated === true;
+};
+
 const handlePasswordSubmit = async (event) => {
   event.preventDefault();
   passwordError.textContent = "";
@@ -1522,7 +1533,15 @@ window.addEventListener("load", async () => {
   loadQuestions();
   window.setInterval(loadRemoteSession, sessionIdlePollMs);
 
-  authState.startupUnlocked = await showPasswordGate("startup");
+  try {
+    authState.startupUnlocked = await hasSavedStartupAccess();
+  } catch {
+    authState.startupUnlocked = false;
+  }
+
+  if (!authState.startupUnlocked) {
+    authState.startupUnlocked = await showPasswordGate("startup");
+  }
   if (!authState.startupUnlocked) {
     return;
   }

@@ -37,6 +37,8 @@
    - `ADMIN_PASSWORD`: 管理者画面と実施状態の更新に使うパスワード
 3. Pages プロジェクトをデプロイし直します。
 
+参加用パスワードの認証に成功すると、そのブラウザーには30日間有効な署名付き `HttpOnly` Cookie が保存され、次回から参加用パスワード画面を省略します。Cookie にパスワード自体は保存されず、JavaScript からも読み取れません。`PASSWORD` を変更すると既存の Cookie は自動的に無効になります。管理者パスワードは保存しません。
+
 Durable Objectsを本当に使う場合だけ、別途 `school-rpg-session-do` Worker と `GAME_SESSION_DO` binding が必要です。`wrangler.toml` に `script_name = "school-rpg-session-do"` を書くと、Cloudflare PagesはそのWorkerが実在する前提でFunctionsを公開しようとします。Workerが存在しない場合は `Script school-rpg-session-do not found` でデプロイが失敗するため、このリポジトリのPages用 `wrangler.toml` にはDurable Object bindingを書かない構成にしています。
 
 ### KV をフォールバックとして使う場合
