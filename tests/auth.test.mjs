@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { onRequestGet, onRequestPost } from '../functions/api/auth.js';
 
 const env = { PASSWORD: 'student-secret', ADMIN_PASSWORD: 'admin-secret' };
 const post = (body) => onRequestPost({ env, request: new Request('https://example.test/api/auth', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 }) });
+
+test('password gate starts hidden and is only opened after the saved-access check', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../main.js', import.meta.url), 'utf8');
+  assert.match(html, /id="passwordGate"[^>]*\shidden(?:\s|>)/);
+  assert.match(main, /if \(!authState\.startupUnlocked\) \{\s*authState\.startupUnlocked = await showPasswordGate\("startup"\);/);
+});
 
 test('startup authentication issues a hardened cookie accepted by GET', async () => {
   const response = await post({ mode: 'startup', password: env.PASSWORD });

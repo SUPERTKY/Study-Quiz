@@ -1541,6 +1541,8 @@ window.addEventListener("load", async () => {
 
   if (!authState.startupUnlocked) {
     authState.startupUnlocked = await showPasswordGate("startup");
+  } else {
+    passwordGate.hidden = true;
   }
   if (!authState.startupUnlocked) {
     return;
