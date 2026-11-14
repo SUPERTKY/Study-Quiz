@@ -100,9 +100,7 @@ img {
 }
 
 .remembered-start-button:focus-visible {
-  outline: 2px solid rgba(225, 230, 235, 0.9);
-  outline-offset: 8px;
-  border-radius: 12px;
+  outline: none;
 }
 
 .remembered-start-button:active {
