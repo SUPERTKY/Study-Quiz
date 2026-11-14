@@ -67,6 +67,47 @@ img {
   opacity: 1;
 }
 
+.remembered-start-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 11;
+  width: min(68vw, 620px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 16px 24px rgba(0, 35, 110, 0.58));
+  transform: translate(-50%, -50%) scale(1);
+  animation: remembered-start-pulse 1.8s ease-in-out infinite;
+}
+
+.remembered-start-button img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.remembered-start-button:hover,
+.remembered-start-button:focus-visible {
+  filter: brightness(1.12) drop-shadow(0 18px 30px rgba(0, 102, 255, 0.72));
+  outline: none;
+}
+
+.remembered-start-button:active {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+@keyframes remembered-start-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
 .next-screen {
   display: grid;
   place-items: center;

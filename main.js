@@ -46,6 +46,7 @@ const passwordModes = {
 
 const opening = document.querySelector("#opening");
 const openingImage = document.querySelector("#openingImage");
+const rememberedStartButton = document.querySelector("#rememberedStartButton");
 const openingAudio = document.querySelector("#openingAudio");
 const battleAudio = document.querySelector("#battleAudio");
 const turnStartAudio = document.querySelector("#turnStartAudio");
@@ -212,6 +213,17 @@ const showPasswordGate = (mode) => {
 
   return new Promise((resolve) => {
     authState.pendingResolve = resolve;
+  });
+};
+
+const waitForRememberedStart = () => {
+  rememberedStartButton.hidden = false;
+  rememberedStartButton.focus({ preventScroll: true });
+  return new Promise((resolve) => {
+    rememberedStartButton.addEventListener("click", () => {
+      rememberedStartButton.hidden = true;
+      resolve();
+    }, { once: true });
   });
 };
 
@@ -1533,8 +1545,10 @@ window.addEventListener("load", async () => {
   loadQuestions();
   window.setInterval(loadRemoteSession, sessionIdlePollMs);
 
+  let usedSavedAccess = false;
   try {
-    authState.startupUnlocked = await hasSavedStartupAccess();
+    usedSavedAccess = await hasSavedStartupAccess();
+    authState.startupUnlocked = usedSavedAccess;
   } catch {
     authState.startupUnlocked = false;
   }
@@ -1546,6 +1560,10 @@ window.addEventListener("load", async () => {
   }
   if (!authState.startupUnlocked) {
     return;
+  }
+
+  if (usedSavedAccess) {
+    await waitForRememberedStart();
   }
 
   window.setTimeout(() => {

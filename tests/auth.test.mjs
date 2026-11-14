@@ -13,6 +13,8 @@ test('password gate starts hidden and is only opened after the saved-access chec
   const main = await readFile(new URL('../main.js', import.meta.url), 'utf8');
   assert.match(html, /id="passwordGate"[^>]*\shidden(?:\s|>)/);
   assert.match(main, /if \(!authState\.startupUnlocked\) \{\s*authState\.startupUnlocked = await showPasswordGate\("startup"\);/);
+  assert.match(html, /id="rememberedStartButton"[^>]*\shidden(?:\s|>)/);
+  assert.match(main, /if \(usedSavedAccess\) \{\s*await waitForRememberedStart\(\);/);
 });
 
 test('startup authentication issues a hardened cookie accepted by GET', async () => {
